@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+requests
+pydantic
+python-dotenv
+requests
+pytest
+pocketbase
+pydantic-settings
