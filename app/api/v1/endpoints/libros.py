@@ -1,8 +1,8 @@
 from http import HTTPStatus
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Query
 from app.pb_clients.libros import db_get_libro, db_create_libro, db_delete_libro, db_update_libro, db_get_all_libros, \
-    db_get_all, db_get_last_id_libro
+    db_get_all, db_get_last_id_libro, db_get_libros_paginados
 from app.models.db_models import Libro
 
 router = APIRouter(
@@ -35,6 +35,20 @@ def api_db_get_estadisticas_admin_panel_a():
         return db_get_last_id_libro()
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
+@router.get("/get", response_model=[], summary="Get a book by pk_id_libro")
+@router.get("/get/", response_model=[], summary="Get a book by pk_id_libro")
+def get_libros(
+    limit: int = Query(10, ge=1),
+    offset: int = Query(0, ge=0)
+):
+    """
+    Obtenemos los libros por páginación
+    """
+    try:
+        return db_get_libros_paginados(limit, offset)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/get/{pk_id_libro}", response_model=Libro, summary="Get a book by pk_id_libro")
 def api_get_prestamo(pk_id_libro: int):
@@ -47,7 +61,7 @@ def api_get_prestamo(pk_id_libro: int):
         return db_get_libro(pk_id_libro)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
-
+    
 @router.get("/get/ultimos/{cantidad}", response_model=[], summary="Get a book by pk_id_libro")
 def api_get_all_libros(cantidad: int):
     """

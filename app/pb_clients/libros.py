@@ -92,6 +92,8 @@ def db_create_libro(libro: Libro):
 
 def db_get_libro(pk_id_libro: int) -> Libro:
     client = db_get_client()
+    base_url = "http://localhost:8090"
+    collection_id = "pbc_2270877598"
     record = client.collection("Libros").get_first_list_item(
         f'pk_id_libro = {pk_id_libro}',
     )
@@ -101,7 +103,7 @@ def db_get_libro(pk_id_libro: int) -> Libro:
         titulo=record.titulo,
         autor=record.autor,
         fecha_publicacion=record.fecha_publicacion,
-        ruta_img=record.ruta_img,
+        ruta_img=f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
@@ -242,6 +244,56 @@ def db_get_all_libros(cantidad: int) -> List:
             "departamento": nombre_departamento,
         }
         libros.append(libro)
+    return libros
+
+def db_get_libros_paginados(limit: int, offset: int) -> List:
+    client = db_get_client()
+
+    # convertir offset → page
+    page = (offset // limit) + 1
+
+    result = client.collection("Libros").get_list(
+        page,
+        limit,
+        {"expand": "fk_id_departamento,fk_id_genero",}
+    )
+
+    libros = []
+
+    for record in result.items:
+        base_url = "http://localhost:8090"
+        collection_id = "pbc_2270877598"
+
+        nombre_departamento = ""
+        departamento_numero = ""
+        genero_nombre = []
+
+        departamento = record.expand.get("fk_id_departamento")
+        generos_list = record.expand.get("fk_id_genero")
+
+        if departamento:
+            nombre_departamento = departamento.nombre
+            departamento_numero = departamento.numero
+
+        if generos_list:
+            for genero in generos_list:
+                genero_nombre.append(genero.genero)
+
+        libro = {
+            "id": record.id,
+            "pk_id_libro": record.pk_id_libro,
+            "titulo": record.titulo,
+            "autor": record.autor,
+            "fecha_publicacion": record.fecha_publicacion,
+            "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
+            "copias": record.copias,
+            "genero": genero_nombre,
+            "departamento_numero": departamento_numero,
+            "departamento": nombre_departamento,
+        }
+
+        libros.append(libro)
+
     return libros
 
 def db_get_last_id_libro() -> int:
