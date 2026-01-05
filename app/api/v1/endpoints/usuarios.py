@@ -1,5 +1,7 @@
 from typing import List
 
+from pocketbase.utils import ClientResponseError
+
 from fastapi import APIRouter, HTTPException, status
 from app.pb_clients.usuarios import (
     db_get_usuario,
@@ -61,15 +63,22 @@ def api_db_get_estadisticas_admin_panel_a():
 @router.get("/validation", response_model=Usuario, summary="Get a Usuario by ID")
 @router.get("/validation/", response_model=Usuario, summary="Get a Usuario by ID")
 def api_db_auth_usuario(email: str, password: str):
-    """
-    Fetch a single usuario by its ID.
-
-    - **pk_id_usuario**: The ID of the user to fetch.
-    """
     try:
-        return db_auth_usuario(email, password)
+        # Intentamos la autenticación
+        usuario = db_auth_usuario(email, password)    
+        # Si db_auth_usuario retorna None por lógica interna
+        if usuario is None:
+            raise HTTPException(status_code=401, detail="No autorizado")
+        return usuario
+    except ClientResponseError as e:
+        # Si PocketBase lanzó 400 o 404, nosotros respondemos 401
+        raise HTTPException(
+            status_code=401, 
+            detail="Credenciales inválidas o usuario no encontrado"
+        )
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        # Para cualquier otro error (conexión, base de datos caída, etc.)
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/validation_admin", response_model=Usuario, summary="Get a Usuario by ID")
 @router.get("/validation_admin/", response_model=Usuario, summary="Get a Usuario by ID")

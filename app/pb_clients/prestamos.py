@@ -10,6 +10,14 @@ from app.pb_clients.usuarios import db_get_usuario
 
 from app.pb_clients.libros import *
 
+import time
+
+url_imagenes = "192.168.100.3"
+
+LIBROS_CACHE: List = []
+CACHE_LAST_UPDATE = 0
+CACHE_TTL = 60  # segundos (ej: 1 minuto)
+
 def db_create_prestamo(prestamo: Prestamo) -> Prestamo:
     client = db_get_client()
     record = client.collection("Prestamos").create(prestamo.model_dump(mode="json"))
@@ -65,7 +73,7 @@ def db_get_top_libros(top: int) -> List:
     top_libros = []
     cont = 0
 
-    base_url = "http://localhost:8090"
+    base_url = f'http://{url_imagenes}:8090'
     collection_id = "pbc_2270877598"
 
     for key, value in conteo.items():
@@ -104,6 +112,21 @@ def db_get_top_libros(top: int) -> List:
         else:
             break
     return top_libros
+
+
+
+def refresh_libros_cache():
+    global LIBROS_CACHE, CACHE_LAST_UPDATE
+
+    libros = db_get_top_libros(10)  # TU FUNCIÓN
+    LIBROS_CACHE = libros
+    CACHE_LAST_UPDATE = time.time()
+
+def get_libros_cache():
+    if time.time() - CACHE_LAST_UPDATE > CACHE_TTL:
+        refresh_libros_cache()
+
+    return LIBROS_CACHE
 
 
 def db_get_mis_prestamos_pendientes(pk_id_usuario: int) -> List:

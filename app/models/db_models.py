@@ -24,6 +24,7 @@ class Usuario(BaseModel):
     verified: bool
     email: str
     fk_id_tipo_usuario: str
+    fecha_nacimiento: Union[Optional[datetime], str] = None
     created_at: Union[Optional[datetime], str] = None
     updated_at: Union[Optional[datetime], str] = None
 

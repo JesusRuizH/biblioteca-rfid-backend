@@ -16,6 +16,8 @@ import base64
 import requests
 from pocketbase.client import FileUpload
 
+url_imagenes = "192.168.100.3"
+
 def db_create_libro(libro: Libro):
     client = db_get_client()
     direccion_img = libro.ruta_img
@@ -92,7 +94,7 @@ def db_create_libro(libro: Libro):
 
 def db_get_libro(pk_id_libro: int) -> Libro:
     client = db_get_client()
-    base_url = "http://localhost:8090"
+    base_url = f'http://{url_imagenes}:8090'
     collection_id = "pbc_2270877598"
     record = client.collection("Libros").get_first_list_item(
         f'pk_id_libro = {pk_id_libro}',
@@ -216,7 +218,7 @@ def db_get_all_libros(cantidad: int) -> List:
     )
     libros = []
     for record in records:
-        base_url = "http://localhost:8090"
+        base_url = f'http://{url_imagenes}:8090'
         collection_id = "pbc_2270877598"
         nombre_departamento = ""
         departamento_numero = ""
@@ -261,7 +263,7 @@ def db_get_libros_paginados(limit: int, offset: int) -> List:
     libros = []
 
     for record in result.items:
-        base_url = "http://localhost:8090"
+        base_url = f'http://{url_imagenes}:8090'
         collection_id = "pbc_2270877598"
 
         nombre_departamento = ""
@@ -310,7 +312,7 @@ def db_get_last_id_libro() -> int:
     return last_book.items[0].pk_id_libro
 
 def db_get_all() -> List[Libro]:
-    base_url = "http://localhost:8090"
+    base_url = f'http://{url_imagenes}:8090'
     collection_id = "pbc_2270877598"
     client = db_get_client()
     record = client.collection("Libros").get_full_list()

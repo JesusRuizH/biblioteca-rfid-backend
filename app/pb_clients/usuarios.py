@@ -65,6 +65,13 @@ def db_auth_usuario(email: str, password: str) -> Usuario:
     client = db_get_client()
     auth_data = client.collection("Usuarios").auth_with_password(email, password)
     record = auth_data.record
+    id_tipo_usuario = str(record.fk_id_tipo_usuario)
+    rol = ""
+    tipo_usuario = client.collection("TipoUsuario").get_one(id_tipo_usuario)
+    if tipo_usuario is None:
+        rol = "NA"
+    else:
+        rol = tipo_usuario.rol
 
     return Usuario(
         id=record.id,
@@ -72,7 +79,8 @@ def db_auth_usuario(email: str, password: str) -> Usuario:
         nombre_usuario=record.nombre_usuario,
         email=record.email,
         verified=record.verified,
-        fk_id_tipo_usuario=record.fk_id_tipo_usuario,
+        fk_id_tipo_usuario= rol,
+        fecha_nacimiento=record.fecha_nacimiento,
         created_at=record.created,
         updated_at=record.updated,
     )
@@ -95,6 +103,7 @@ def db_auth_admin(email: str, password: str) -> Usuario:
         email=record.email,
         verified=record.verified,
         fk_id_tipo_usuario=record.fk_id_tipo_usuario,
+        fecha_nacimiento=record.fecha_nacimiento,
         created_at=record.created,
         updated_at=record.updated,
     )

@@ -17,7 +17,8 @@ from app.pb_clients.prestamos import (
     db_get_historial_prestamos_admin,
     db_get_generos_leidos_admin,
     db_get_total_prestamos,
-    db_get_last_id_prestamos
+    db_get_last_id_prestamos,
+    get_libros_cache
 )
 from app.models.db_models import Prestamo
 
@@ -114,7 +115,7 @@ def api_db_get_top_libros(top: int):
     - **top**: Recupera el top de libros indicado por el usuario.
     """
     try:
-        return db_get_top_libros(top)
+        return get_libros_cache()
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
