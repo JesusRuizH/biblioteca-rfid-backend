@@ -8,6 +8,8 @@ from app.core.auth import db_get_client
 
 from pocketbase.client import FileUpload
 
+from app.core.config import settings
+
 
 def db_create_genero(genero: Generos) -> Generos:
     client = db_get_client()
@@ -53,7 +55,7 @@ def db_get_genero(pk_id_genero: int) -> Generos:
 
 def db_get_all_generos() -> List[Generos]:
     client = db_get_client()
-    base_url = "http://localhost:8090"
+    base_url = settings.POCKETBASE_URL_IMAGENES
     collection_id = "pbc_2202816583"
     generos_records = client.collection("Generos").get_full_list()
     generos_list = []

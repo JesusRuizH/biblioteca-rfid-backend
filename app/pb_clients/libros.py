@@ -2,6 +2,7 @@ import base64
 import os
 import re
 from typing import List
+from app.core.config import settings
 
 import requests
 
@@ -15,8 +16,6 @@ import re
 import base64
 import requests
 from pocketbase.client import FileUpload
-
-url_imagenes = "192.168.100.3"
 
 def db_create_libro(libro: Libro):
     client = db_get_client()
@@ -65,6 +64,7 @@ def db_create_libro(libro: Libro):
             "pk_id_libro": libro.pk_id_libro,
             "titulo": libro.titulo,
             "autor": libro.autor,
+            "descripcion": libro.descripcion,
             "fecha_publicacion": libro.fecha_publicacion,
             "ruta_img": file_upload,  # campo tipo file en PB
             "copias": libro.copias,
@@ -81,6 +81,7 @@ def db_create_libro(libro: Libro):
         pk_id_libro=record.pk_id_libro,
         titulo=record.titulo,
         autor=record.autor,
+        descripcion= record.descripcion,
         fecha_publicacion=record.fecha_publicacion,
         ruta_img=record.ruta_img,   # 👉 ya es URL pública de PB
         copias=record.copias,
@@ -94,7 +95,7 @@ def db_create_libro(libro: Libro):
 
 def db_get_libro(pk_id_libro: int) -> Libro:
     client = db_get_client()
-    base_url = f'http://{url_imagenes}:8090'
+    base_url = settings.POCKETBASE_URL_IMAGENES
     collection_id = "pbc_2270877598"
     record = client.collection("Libros").get_first_list_item(
         f'pk_id_libro = {pk_id_libro}',
@@ -104,6 +105,7 @@ def db_get_libro(pk_id_libro: int) -> Libro:
         pk_id_libro=record.pk_id_libro,
         titulo=record.titulo,
         autor=record.autor,
+        descripcion= record.descripcion,
         fecha_publicacion=record.fecha_publicacion,
         ruta_img=f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
         copias=record.copias,
@@ -158,6 +160,7 @@ def db_update_libro(libro: Libro):
         "pk_id_libro": libro.pk_id_libro,
         "titulo": libro.titulo,
         "autor": libro.autor,
+        "descripcion": libro.descripcion,
         "fecha_publicacion": libro.fecha_publicacion,
         "copias": libro.copias,
         "fk_id_departamento": libro.fk_id_departamento,
@@ -178,6 +181,7 @@ def db_update_libro(libro: Libro):
         pk_id_libro=record.pk_id_libro,
         titulo=record.titulo,
         autor=record.autor,
+        descripcion= record.descripcion,
         fecha_publicacion=record.fecha_publicacion,
         ruta_img=record.ruta_img,
         copias=record.copias,
@@ -218,7 +222,7 @@ def db_get_all_libros(cantidad: int) -> List:
     )
     libros = []
     for record in records:
-        base_url = f'http://{url_imagenes}:8090'
+        base_url = settings.POCKETBASE_URL_IMAGENES
         collection_id = "pbc_2270877598"
         nombre_departamento = ""
         departamento_numero = ""
@@ -238,6 +242,7 @@ def db_get_all_libros(cantidad: int) -> List:
             "pk_id_libro": record.pk_id_libro,
             "titulo":  record.titulo,
             "autor": record.autor,
+            "descripcion": record.descripcion,
             "fecha_publicacion": record.fecha_publicacion,
             "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
             "copias": record.copias,
@@ -263,7 +268,7 @@ def db_get_libros_paginados(limit: int, offset: int) -> List:
     libros = []
 
     for record in result.items:
-        base_url = f'http://{url_imagenes}:8090'
+        base_url = settings.POCKETBASE_URL_IMAGENES
         collection_id = "pbc_2270877598"
 
         nombre_departamento = ""
@@ -286,6 +291,7 @@ def db_get_libros_paginados(limit: int, offset: int) -> List:
             "pk_id_libro": record.pk_id_libro,
             "titulo": record.titulo,
             "autor": record.autor,
+            "descripcion": record.descripcion,
             "fecha_publicacion": record.fecha_publicacion,
             "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
             "copias": record.copias,
@@ -312,7 +318,7 @@ def db_get_last_id_libro() -> int:
     return last_book.items[0].pk_id_libro
 
 def db_get_all() -> List[Libro]:
-    base_url = f'http://{url_imagenes}:8090'
+    base_url = settings.POCKETBASE_URL_IMAGENES
     collection_id = "pbc_2270877598"
     client = db_get_client()
     record = client.collection("Libros").get_full_list()
@@ -324,6 +330,7 @@ def db_get_all() -> List[Libro]:
                  pk_id_libro=r.pk_id_libro,
                  titulo=r.titulo,
                  autor=r.autor,
+                 descripcion=r.descripcion,
                  fecha_publicacion=r.fecha_publicacion,
                  ruta_img=f"{base_url}/api/files/{collection_id}/{r.id}/{r.ruta_img}",
                  copias=r.copias,

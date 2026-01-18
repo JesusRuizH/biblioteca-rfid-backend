@@ -18,7 +18,7 @@ def db_create_usuario(usuario: Usuario) -> Usuario:
         id=record.id,
         pk_id_usuario=record.pk_id_usuario,
         nombre_usuario=record.nombre_usuario,
-        email=record.email,
+        email=record.email.lower(),
         verified=record.verified,
         fk_id_tipo_usuario=record.fk_id_tipo_usuario,
         created_at=record.created_at,
@@ -63,7 +63,7 @@ def db_get_usuario(pk_id_usuario: int) -> Usuario:
 
 def db_auth_usuario(email: str, password: str) -> Usuario:
     client = db_get_client()
-    auth_data = client.collection("Usuarios").auth_with_password(email, password)
+    auth_data = client.collection("Usuarios").auth_with_password(email.lower(), password)
     record = auth_data.record
     id_tipo_usuario = str(record.fk_id_tipo_usuario)
     rol = ""
@@ -89,7 +89,7 @@ def db_auth_admin(email: str, password: str) -> Usuario:
     client = db_get_client()
 
     # autenticamos con email + password
-    auth_data = client.collection("Usuarios").auth_with_password(email, password)
+    auth_data = client.collection("Usuarios").auth_with_password(email.lower(), password)
     record = auth_data.record
 
     # validar que sea admin (campo fk_id_tipo_usuario)

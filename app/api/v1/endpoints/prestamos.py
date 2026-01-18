@@ -18,7 +18,8 @@ from app.pb_clients.prestamos import (
     db_get_generos_leidos_admin,
     db_get_total_prestamos,
     db_get_last_id_prestamos,
-    get_libros_cache
+    get_libros_cache,
+    db_get_mis_recomendaciones
 )
 from app.models.db_models import Prestamo
 
@@ -68,6 +69,7 @@ def api_db_get_generos_leidos_admin():
         return db_get_generos_leidos_admin()
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
 @router.get("/historial_prestamos_admin/{cantidad}", response_model=[], summary="get last 5 loans")
 def api_db_get_historial_prestamos_admin(cantidad : int):
     """
@@ -142,6 +144,8 @@ def api_db_get_prestamos_por_mes(pk_id_usuario: int):
         return db_get_prestamos_por_mes(pk_id_usuario)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
+
 
 @router.get("/historial_prestamos/{pk_id_usuario}", response_model=[], summary="get loans based on pk_id_usuario ")
 def api_db_get_historial_prestamos(pk_id_usuario: int):
@@ -152,6 +156,18 @@ def api_db_get_historial_prestamos(pk_id_usuario: int):
     """
     try:
         return db_get_historial_prestamos(pk_id_usuario)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
+@router.get("/mis_recomendaciones/{pk_id_usuario}", response_model=[], summary="get loans based on pk_id_usuario ")
+def api_db_get_mis_recomendaciones(pk_id_usuario: int):
+    """
+    Fetch a single préstamo (loan) by its ID.
+
+    - **pk_id_usuario**: Recupera una lista de recomendación basada en Machine Learning y arboles de decision
+    """
+    try:
+        return db_get_mis_recomendaciones(pk_id_usuario)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 

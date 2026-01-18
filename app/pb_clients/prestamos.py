@@ -12,7 +12,7 @@ from app.pb_clients.libros import *
 
 import time
 
-url_imagenes = "192.168.100.3"
+from app.core.config import settings
 
 LIBROS_CACHE: List = []
 CACHE_LAST_UPDATE = 0
@@ -73,7 +73,7 @@ def db_get_top_libros(top: int) -> List:
     top_libros = []
     cont = 0
 
-    base_url = f'http://{url_imagenes}:8090'
+    base_url = settings.POCKETBASE_URL_IMAGENES
     collection_id = "pbc_2270877598"
 
     for key, value in conteo.items():
@@ -99,6 +99,7 @@ def db_get_top_libros(top: int) -> List:
                 "pk_id_libro": libro.pk_id_libro,
                 "titulo": libro.titulo,
                 "autor": libro.autor,
+                "descripcion": libro.descripcion,
                 "fecha_publicacion": libro.fecha_publicacion,
                 "ruta_img": f"{base_url}/api/files/{collection_id}/{libro.id}/{libro.ruta_img}",
                 "copias": libro.copias,
@@ -200,6 +201,54 @@ def db_get_historial_prestamos(pk_id_usuario: int) -> List:
         }
         mis_prestamos.append(libros_prestados)
     return mis_prestamos
+
+def db_get_mis_recomendaciones(pk_id_usuario: int) -> List: 
+    # Basado en el id del usuario retornaremos un conjunto de recomendaciones basadas en Basic ML y arboles de decisión
+    client = db_get_client()
+    usuario = db_get_usuario(pk_id_usuario)
+    prestamos = client.collection("Prestamos").get_list(
+        1,
+        20,
+        {
+            "filter": f'fk_id_usuario = "{usuario.id}"',
+            "expand": "fk_id_copia.fk_id_libro.fk_id_genero"
+        }
+    )
+    mis_prestamos = []
+
+    for prestamo in prestamos.items:
+        titulo_libro = ""
+        autor = ""
+        descripcion = ""
+        genero_lista = []
+        copia = prestamo.expand.get("fk_id_copia")
+        if copia:
+            libro = copia.expand.get("fk_id_libro")
+            if libro:
+                titulo_libro = libro.titulo
+                autor = libro.autor
+                descripcion = libro.descripcion
+                generos = libro.expand.get("fk_id_genero")
+                if generos:
+                    for genero in generos:
+                        genero_lista.append(genero.genero)
+
+
+        libros_prestados = {
+            "pk_id_prestamo": prestamo.pk_id_prestamo,
+            "titulo": titulo_libro,
+            "autor": autor,
+            "descripcion": descripcion, 
+            "genero": genero_lista,
+            "fecha_prestamo": prestamo.fecha_prestamo,
+            "fecha_entrega": prestamo.fecha_entrega,
+            "estatus_entrega": prestamo.estatus_entrega,
+        }
+        mis_prestamos.append(libros_prestados)
+
+
+    return mis_prestamos
+
 
 def db_get_total_prestamos() -> int:
     client = db_get_client()

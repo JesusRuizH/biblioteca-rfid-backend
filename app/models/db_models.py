@@ -45,6 +45,7 @@ class Libro(BaseModel):
     pk_id_libro: int
     titulo: str
     autor: str
+    descripcion: str
     fecha_publicacion: Union[Optional[datetime], str] = None
     ruta_img: Optional[str] = None
     copias: Optional[int] = 0

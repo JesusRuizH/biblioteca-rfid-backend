@@ -3,6 +3,8 @@ from collections import Counter
 
 from app.core.auth import db_get_client
 
+from app.core.config import settings
+
 
 def db_get_top_libros(top: int) -> List:
     client = db_get_client()
@@ -21,7 +23,7 @@ def db_get_top_libros(top: int) -> List:
     top_libros = []
     cont = 0
 
-    base_url = "http://localhost:8090"
+    base_url = settings.POCKETBASE_URL_IMAGENES
     collection_id = "pbc_2270877598"
 
     for key, value in conteo.items():
@@ -47,6 +49,7 @@ def db_get_top_libros(top: int) -> List:
                 "pk_id_libro": libro.pk_id_libro,
                 "titulo": libro.titulo,
                 "autor": libro.autor,
+                "descripcion": libro.descripcion,
                 "fecha_publicacion": libro.fecha_publicacion,
                 "ruta_img": f"{base_url}/api/files/{collection_id}/{libro.id}/{libro.ruta_img}",
                 "copias": libro.copias,

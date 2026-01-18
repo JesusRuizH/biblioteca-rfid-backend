@@ -7,3 +7,6 @@ requests
 pytest
 pocketbase
 pydantic-settings
+pandas
+numpy
+scikit-learn
