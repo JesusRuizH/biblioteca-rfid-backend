@@ -70,6 +70,7 @@ def db_create_libro(libro: Libro):
             "copias": libro.copias,
             "fk_id_departamento": libro.fk_id_departamento,
             "fk_id_genero": generos,   # 👈 ahora siempre es array
+            "estrellas": None,
             "created_at": libro.created_at,
             "updated_at": libro.updated_at,
         }
@@ -87,6 +88,7 @@ def db_create_libro(libro: Libro):
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,  # 👉 PB devuelve lista
+        estrellas=record.estrellas,
         created_at=record.created,
         updated_at=record.updated,
     )
@@ -111,6 +113,7 @@ def db_get_libro(pk_id_libro: int) -> Libro:
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
+        estrellas=record.estrellas,
         created_at=record.created,
         updated_at=record.updated,
     )
@@ -165,6 +168,7 @@ def db_update_libro(libro: Libro):
         "copias": libro.copias,
         "fk_id_departamento": libro.fk_id_departamento,
         "fk_id_genero": generos,
+        "estrellas":libro.estrellas,
         "updated_at": libro.updated_at,
     }
 
@@ -187,6 +191,7 @@ def db_update_libro(libro: Libro):
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
+        estrellas=record.estrellas,
         created_at=record.created,
         updated_at=record.updated,
     )
@@ -247,6 +252,7 @@ def db_get_all_libros(cantidad: int) -> List:
             "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
             "copias": record.copias,
             "genero": genero_nombre,
+            "estrellas": record.estrellas,
             "departamento_numero": departamento_numero,
             "departamento": nombre_departamento,
         }
@@ -296,6 +302,7 @@ def db_get_libros_paginados(limit: int, offset: int) -> List:
             "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
             "copias": record.copias,
             "genero": genero_nombre,
+            "estrellas": record.estrellas,
             "departamento_numero": departamento_numero,
             "departamento": nombre_departamento,
         }
@@ -336,6 +343,7 @@ def db_get_all() -> List[Libro]:
                  copias=r.copias,
                  fk_id_departamento=r.fk_id_departamento,
                  fk_id_genero=r.fk_id_genero,
+                 estrellas=r.estrellas,
                  created_at=r.created,
                  updated_at=r.updated,
             )

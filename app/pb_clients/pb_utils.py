@@ -54,6 +54,7 @@ def db_get_top_libros(top: int) -> List:
                 "ruta_img": f"{base_url}/api/files/{collection_id}/{libro.id}/{libro.ruta_img}",
                 "copias": libro.copias,
                 "genero": genero_nombre,
+                "estrellas": libro.estrellas,
                 "departamento_numero": departamento_numero,
                 "departamento": nombre_departamento,
                 "veces_prestado": value

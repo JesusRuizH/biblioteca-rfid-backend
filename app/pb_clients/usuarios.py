@@ -1,5 +1,7 @@
 from datetime import date, datetime
 from typing import List, Dict
+from pocketbase import PocketBase
+from app.core.config import settings
 
 from requests.models import Response
 from app.core.auth import db_get_client
@@ -62,7 +64,7 @@ def db_get_usuario(pk_id_usuario: int) -> Usuario:
     )
 
 def db_auth_usuario(email: str, password: str) -> Usuario:
-    client = db_get_client()
+    client = PocketBase(f'{settings.POCKETBASE_URL}')
     auth_data = client.collection("Usuarios").auth_with_password(email.lower(), password)
     record = auth_data.record
     id_tipo_usuario = str(record.fk_id_tipo_usuario)
@@ -86,7 +88,7 @@ def db_auth_usuario(email: str, password: str) -> Usuario:
     )
 
 def db_auth_admin(email: str, password: str) -> Usuario:
-    client = db_get_client()
+    client = PocketBase(f'{settings.POCKETBASE_URL}')
 
     # autenticamos con email + password
     auth_data = client.collection("Usuarios").auth_with_password(email.lower(), password)

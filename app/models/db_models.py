@@ -51,6 +51,7 @@ class Libro(BaseModel):
     copias: Optional[int] = 0
     fk_id_departamento: Optional[str] = None
     fk_id_genero: Optional[Union[str, List[str]]] = None
+    estrellas: int
     created_at: Union[Optional[datetime], str] = None
     updated_at: Union[Optional[datetime], str] = None
 

@@ -1,9 +1,10 @@
 from collections import Counter
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List
 
 from requests.models import Response
 
+from app.interfaces.ml import get_ml_recomendaciones
 from app.core.auth import db_get_client
 from app.models.db_models import Prestamo
 from app.pb_clients.usuarios import db_get_usuario
@@ -14,7 +15,7 @@ import time
 
 from app.core.config import settings
 
-LIBROS_CACHE: List = []
+LIBROS_CACHE: List
 CACHE_LAST_UPDATE = 0
 CACHE_TTL = 60  # segundos (ej: 1 minuto)
 
@@ -104,6 +105,7 @@ def db_get_top_libros(top: int) -> List:
                 "ruta_img": f"{base_url}/api/files/{collection_id}/{libro.id}/{libro.ruta_img}",
                 "copias": libro.copias,
                 "genero": genero_nombre,
+                "estrellas": libro.estrellas,
                 "departamento_numero": departamento_numero,
                 "departamento": nombre_departamento,
                 "veces_prestado": value
@@ -220,6 +222,7 @@ def db_get_mis_recomendaciones(pk_id_usuario: int) -> List:
         titulo_libro = ""
         autor = ""
         descripcion = ""
+        estrellas = 0
         genero_lista = []
         copia = prestamo.expand.get("fk_id_copia")
         if copia:
@@ -228,6 +231,7 @@ def db_get_mis_recomendaciones(pk_id_usuario: int) -> List:
                 titulo_libro = libro.titulo
                 autor = libro.autor
                 descripcion = libro.descripcion
+                estrellas = libro.estrellas
                 generos = libro.expand.get("fk_id_genero")
                 if generos:
                     for genero in generos:
@@ -240,14 +244,15 @@ def db_get_mis_recomendaciones(pk_id_usuario: int) -> List:
             "autor": autor,
             "descripcion": descripcion, 
             "genero": genero_lista,
+            "estrellas": estrellas,
             "fecha_prestamo": prestamo.fecha_prestamo,
             "fecha_entrega": prestamo.fecha_entrega,
             "estatus_entrega": prestamo.estatus_entrega,
         }
         mis_prestamos.append(libros_prestados)
+    recomendaciones = get_ml_recomendaciones(mis_prestamos)
 
-
-    return mis_prestamos
+    return recomendaciones
 
 
 def db_get_total_prestamos() -> int:
