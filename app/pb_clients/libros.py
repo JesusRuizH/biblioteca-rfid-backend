@@ -88,7 +88,7 @@ def db_create_libro(libro: Libro):
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,  # 👉 PB devuelve lista
-        estrellas=record.estrellas,
+        estrellas=int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
         created_at=record.created,
         updated_at=record.updated,
     )
@@ -168,7 +168,7 @@ def db_update_libro(libro: Libro):
         "copias": libro.copias,
         "fk_id_departamento": libro.fk_id_departamento,
         "fk_id_genero": generos,
-        "estrellas":libro.estrellas,
+        "estrellas":int(libro.estrellas) if libro.estrellas is not None and libro.estrellas.isdigit() else 0,
         "updated_at": libro.updated_at,
     }
 
@@ -191,7 +191,7 @@ def db_update_libro(libro: Libro):
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
-        estrellas=record.estrellas,
+        estrellas=int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
         created_at=record.created,
         updated_at=record.updated,
     )
@@ -252,7 +252,7 @@ def db_get_all_libros(cantidad: int) -> List:
             "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
             "copias": record.copias,
             "genero": genero_nombre,
-            "estrellas": record.estrellas,
+            "estrellas": int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
             "departamento_numero": departamento_numero,
             "departamento": nombre_departamento,
         }
@@ -302,7 +302,7 @@ def db_get_libros_paginados(limit: int, offset: int) -> List:
             "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
             "copias": record.copias,
             "genero": genero_nombre,
-            "estrellas": record.estrellas,
+            "estrellas": int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
             "departamento_numero": departamento_numero,
             "departamento": nombre_departamento,
         }
@@ -343,7 +343,7 @@ def db_get_all() -> List[Libro]:
                  copias=r.copias,
                  fk_id_departamento=r.fk_id_departamento,
                  fk_id_genero=r.fk_id_genero,
-                 estrellas=r.estrellas,
+                 estrellas=int(r.estrellas) if r.estrellas is not None and r.estrellas.isdigit() else 0,
                  created_at=r.created,
                  updated_at=r.updated,
             )
