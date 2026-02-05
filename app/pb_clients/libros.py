@@ -113,7 +113,7 @@ def db_get_libro(pk_id_libro: int) -> Libro:
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
-        estrellas=record.estrellas,
+        estrellas=int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
         created_at=record.created,
         updated_at=record.updated,
     )
