@@ -1,8 +1,9 @@
 from http import HTTPStatus
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status, Query
 from app.pb_clients.libros import db_get_libro, db_create_libro, db_delete_libro, db_update_libro, db_get_all_libros, \
-    db_get_all, db_get_last_id_libro, db_get_libros_paginados
+    db_get_all, db_get_last_id_libro, db_get_libros_paginados, db_get_libros_lista_paginados
 from app.models.db_models import Libro
 
 router = APIRouter(
@@ -20,6 +21,20 @@ def api_get_all():
     """
     try:
         return db_get_all()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
+@router.get("/get_list_libros", response_model=[], summary="Get a book by pk_id_libro")
+def get_list_libros(
+    limit: int = Query(10, ge=1),
+    offset: int = Query(0, ge=0),
+    q: Optional[str] = Query(None),
+):
+    """
+    Obtenemos los usuarios por páginación
+    """
+    try:
+        return db_get_libros_lista_paginados(limit, offset, q)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 

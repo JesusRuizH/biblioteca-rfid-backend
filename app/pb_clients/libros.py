@@ -1,7 +1,7 @@
 import base64
 import os
 import re
-from typing import List
+from typing import Dict, List
 from app.core.config import settings
 
 import requests
@@ -329,9 +329,9 @@ def db_get_all() -> List[Libro]:
     collection_id = "pbc_2270877598"
     client = db_get_client()
     record = client.collection("Libros").get_full_list()
-    usuarios_list = []
+    libros_list = []
     for r in record:
-        usuarios_list.append(
+        libros_list.append(
              Libro(
                  id=r.id,
                  pk_id_libro=r.pk_id_libro,
@@ -348,4 +348,56 @@ def db_get_all() -> List[Libro]:
                  updated_at=r.updated,
             )
         )
-    return usuarios_list
+    return libros_list
+
+def db_get_libros_lista_paginados(limit, offset, q=None) -> Dict:
+    page = (offset // limit) + 1
+
+    filter_expr = None
+
+    if q:
+        q = q.strip()
+
+        filter_expr = (
+            f'titulo ~ "{q}" || '
+            f'autor ~ "{q}" || '
+            if q.isdigit()
+            else
+            f'titulo ~ "{q}" || autor ~ "{q}"'
+        )
+
+    base_url = settings.POCKETBASE_URL_IMAGENES
+    collection_id = "pbc_2270877598"
+    client = db_get_client()
+    record = client.collection("Libros").get_list(page, 
+                                                  limit, 
+                                                  {
+                                                    "filter": filter_expr
+                                                  })
+    libros_list = []
+    for r in record.items:
+        libros_list.append(
+             Libro(
+                 id=r.id,
+                 pk_id_libro=r.pk_id_libro,
+                 titulo=r.titulo,
+                 autor=r.autor,
+                 descripcion=r.descripcion,
+                 fecha_publicacion=r.fecha_publicacion,
+                 ruta_img=f"{base_url}/api/files/{collection_id}/{r.id}/{r.ruta_img}",
+                 copias=r.copias,
+                 fk_id_departamento=r.fk_id_departamento,
+                 fk_id_genero=r.fk_id_genero,
+                 estrellas=int(r.estrellas) if r.estrellas is not None and r.estrellas.isdigit() else 0,
+                 created_at=r.created,
+                 updated_at=r.updated,
+            )
+        )
+
+    #print(record)
+    response = {
+        "items": libros_list,
+        "total": record.total_items
+    }
+
+    return response

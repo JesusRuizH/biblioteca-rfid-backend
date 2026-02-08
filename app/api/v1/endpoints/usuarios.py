@@ -1,8 +1,8 @@
-from typing import List
+from typing import List, Optional
 
 from pocketbase.utils import ClientResponseError
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Query
 from app.pb_clients.usuarios import (
     db_get_usuario,
     db_create_usuario,
@@ -12,7 +12,8 @@ from app.pb_clients.usuarios import (
     db_get_estadisticas_admin_panel_a,
     db_auth_usuario,
     db_get_last_id_usuario,
-    db_get_all_usuarios, db_auth_admin
+    db_get_all_usuarios, db_auth_admin,
+    db_get_users_paginados
 )
 from app.models.db_models import Usuario
 
@@ -44,6 +45,20 @@ def api_db_get_all_usuarios():
     """
     try:
         return db_get_all_usuarios()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
+@router.get("/get_users", response_model=[], summary="Get a book by pk_id_libro")
+def get_users(
+    limit: int = Query(10, ge=1),
+    offset: int = Query(0, ge=0),
+    q: Optional[str] = Query(None),
+):
+    """
+    Obtenemos los usuarios por páginación
+    """
+    try:
+        return db_get_users_paginados(limit, offset, q)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 

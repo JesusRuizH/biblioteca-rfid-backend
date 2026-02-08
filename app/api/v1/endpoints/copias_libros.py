@@ -1,13 +1,14 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Query
 from app.pb_clients.copias_libros import (
     db_get_copia_libro,
     db_create_copia_libro,
     db_update_copia_libro,
     db_delete_copia_libro,
     db_get_copia_libro_rfid,
-    db_update_stat_copia_libro_prestado, db_update_stat_copia_libro_devuelto, db_get_ultimo_id_copia, db_get_all_copies
+    db_update_stat_copia_libro_prestado, db_update_stat_copia_libro_devuelto, db_get_ultimo_id_copia, db_get_all_copies,
+    db_get_copias_paginadas
 )
 from app.models.db_models import CopiaLibro
 
@@ -26,6 +27,20 @@ def api_db_get_all_copies():
     """
     try:
         return db_get_all_copies()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
+@router.get("/get_copies", response_model=[], summary="Get a book by pk_id_libro")
+def get_users(
+    limit: int = Query(10, ge=1),
+    offset: int = Query(0, ge=0),
+    q: Optional[str] = Query(None),
+):
+    """
+    Obtenemos los usuarios por páginación
+    """
+    try:
+        return db_get_copias_paginadas(limit, offset, q)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 

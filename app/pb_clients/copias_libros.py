@@ -79,6 +79,58 @@ def db_get_all_copies() -> List:
         )
     return copias_list
 
+def db_get_copias_paginadas(limit, offset, q=None) -> Dict:
+    page = (offset // limit) + 1
+
+    base_url = "http://localhost:8090"
+    collection_id = "pbc_2270877598"
+    client = db_get_client()
+
+    query_params = {
+        "expand": "fk_id_libro"
+    }
+
+    if q:
+        q = q.strip()
+        query_params["filter"] = f'rfid_tag ~ "{q}" || isbn ~ "{q}"'
+
+    record = client.collection("CopiasLibro").get_list(
+        page=page,
+        per_page=limit,
+        query_params=query_params
+    )
+
+    copias_list = []
+
+    for r in record.items:
+        libro = r.expand.get("fk_id_libro") if r.expand else None
+
+        copias_list.append(
+            {
+                "id": r.id,
+                "pk_id_copia": r.pk_id_copia,
+                "libro": {
+                    "autor": libro.autor if libro else None,
+                    "titulo": libro.titulo if libro else None,
+                    "ruta_img": (
+                        f"{base_url}/api/files/{collection_id}/{libro.id}/{libro.ruta_img}"
+                        if libro and libro.ruta_img
+                        else None
+                    )
+                },
+                "fk_id_libro": r.fk_id_libro,
+                "isbn": r.isbn,
+                "rfid_tag": r.rfid_tag,
+                "disponibilidad": r.disponibilidad,
+            }
+        )
+
+    return {
+        "items": copias_list,
+        "total": record.total_items
+    }
+
+
 def db_get_copia_libro_rfid(rfid: str) -> Dict:
     client = db_get_client()
 

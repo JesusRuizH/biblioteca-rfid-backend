@@ -46,6 +46,45 @@ def db_get_all_usuarios() -> List[Usuario]:
         )
     return usuarios_list
 
+def db_get_users_paginados(limit: int, offset: int, q = None) -> Dict:
+    client = db_get_client()
+
+    page = (offset // limit) + 1
+
+    query_params = {
+        "expand": "fk_id_libro"
+    }
+
+    if q:
+        q = q.strip()
+        query_params["filter"] = f'email ~ "{q}" || nombre_usuario ~ "{q}"'
+
+    record = client.collection("Usuarios").get_list(
+        page,
+        limit,
+        query_params=query_params)
+    
+    usuarios_list = []
+    for r in record.items:
+        usuarios_list.append(
+             Usuario(
+                id=r.id,
+                pk_id_usuario=r.pk_id_usuario,
+                nombre_usuario=r.nombre_usuario,
+                email=r.email,
+                verified=r.verified,
+                fk_id_tipo_usuario=r.fk_id_tipo_usuario,
+                created_at=r.created_at,
+                updated_at=r.updated_at,
+            )
+        )
+
+    response = {
+        "items": usuarios_list,
+        "total": record.total_items
+    }
+    return response
+
 
 def db_get_usuario(pk_id_usuario: int) -> Usuario:
     client = db_get_client()
