@@ -3,11 +3,47 @@ from typing import Dict, List
 from requests.models import Response
 
 from app.core.auth import db_get_client
-from app.models.db_models import CopiaLibro
+from app.models.db_models import CopiaLibro, Libro
+
+from app.pb_clients.libros import (
+    db_update_libro
+)
 
 def db_create_copia_libro(copia_libro: CopiaLibro) -> CopiaLibro:
     client = db_get_client()
-    record = client.collection("CopiasLibro").create(copia_libro.model_dump(mode="json"))
+    copia = copia_libro.model_dump(mode="json")
+    record = client.collection("CopiasLibro").create({
+                                                "pk_id_copia": copia['pk_id_copia'],
+                                                "fk_id_libro": copia['fk_id_libro'],
+                                                "isbn": copia['isbn'],
+                                                "rfid_tag": copia['rfid_tag'],
+                                                "disponibilidad": copia['disponibilidad'],
+                                                })
+
+    
+
+    libro = client.collection('Libros').get_one(copia['fk_id_libro'])
+
+    print(libro.estrellas)
+
+    libro_actualizado = Libro(
+        id=libro.id,
+        pk_id_libro=libro.pk_id_libro,
+        titulo=libro.titulo,
+        autor=libro.autor,
+        descripcion= libro.descripcion,
+        fecha_publicacion=libro.fecha_publicacion,
+        ruta_img=None,
+        copias=int(libro.copias)+1 if libro.copias is not None else 0,
+        fk_id_departamento=libro.fk_id_departamento,
+        fk_id_genero=libro.fk_id_genero,
+        estrellas=int(libro.estrellas),
+        created_at=libro.created,
+        updated_at=None,
+    )
+
+    db_update_libro(libro_actualizado)
+
     return CopiaLibro(
         id=record.id,
         pk_id_copia=record.pk_id_copia,
@@ -237,6 +273,27 @@ def db_delete_copia_libro(pk_id_copia: int) -> Response:
     prestamos = client.collection("Prestamos").get_full_list(
         query_params={"filter": f'fk_id_copia="{copia.id}"'}
     )
+
+    libro = client.collection('Libros').get_one(copia.fk_id_libro)
+
+    libro_actualizado = Libro(
+        id=libro.id,
+        pk_id_libro=libro.pk_id_libro,
+        titulo=libro.titulo,
+        autor=libro.autor,
+        descripcion= libro.descripcion,
+        fecha_publicacion=libro.fecha_publicacion,
+        ruta_img=None,
+        copias=int(libro.copias)-1 if libro.copias is not None else 0,
+        fk_id_departamento=libro.fk_id_departamento,
+        fk_id_genero=libro.fk_id_genero,
+        estrellas=int(libro.estrellas),
+        created_at=libro.created,
+        updated_at=None,
+    )
+
+    db_update_libro(libro_actualizado)
+
     for prestamo in prestamos:
         client.collection("Prestamos").delete(prestamo.id)
 

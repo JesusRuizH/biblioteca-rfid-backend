@@ -55,6 +55,17 @@ class Libro(BaseModel):
     created_at: Union[Optional[datetime], str] = None
     updated_at: Union[Optional[datetime], str] = None
 
+# ---------- Puntuacion ----------
+class Puntuacion(BaseModel):
+    id: Optional[str]
+    pk_id_puntuacion: int
+    fk_id_libro: str
+    fk_id_usuario: str
+    puntuacion: int
+    created: Union[Optional[datetime], str] = None
+    updated: Union[Optional[datetime], str] = None
+   
+
 # ---------- Generos ----------
 
 class Generos(BaseModel):

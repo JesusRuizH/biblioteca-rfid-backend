@@ -3,8 +3,8 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status, Query
 from app.pb_clients.libros import db_get_libro, db_create_libro, db_delete_libro, db_update_libro, db_get_all_libros, \
-    db_get_all, db_get_last_id_libro, db_get_libros_paginados, db_get_libros_lista_paginados
-from app.models.db_models import Libro
+    db_get_all, db_get_last_id_libro, db_get_libros_paginados, db_get_libros_lista_paginados, db_puntuar
+from app.models.db_models import Libro, Puntuacion
 
 router = APIRouter(
     prefix="/libro",
@@ -95,6 +95,17 @@ def api_create_prestamo(libro: Libro):
     # Aquí guardarías a la base de datos o llamas a otra función
     try:
         return db_create_libro(libro)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
+@router.post("/puntuar", response_model=Puntuacion)
+def api_puntuar(puntuacion: Puntuacion):
+    """
+    Puntuaremos un libro en base a su fk_id_libro: str, podemos ademas obtener el id del usuario pero no es obligatorio
+
+    """
+    try:
+        return db_puntuar(puntuacion)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
