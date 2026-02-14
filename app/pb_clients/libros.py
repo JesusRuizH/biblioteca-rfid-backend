@@ -7,7 +7,7 @@ from app.core.config import settings
 import requests
 
 from app.core.auth import db_get_client
-from app.models.db_models import Libro
+from app.models.db_models import Libro, Puntuacion
 from requests.models import Response
 from pocketbase.client import FileUpload
 
@@ -88,11 +88,71 @@ def db_create_libro(libro: Libro):
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,  # 👉 PB devuelve lista
-        estrellas=int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
+        estrellas=int(record.estrellas) if record.estrellas is not None else 0,
         created_at=record.created,
         updated_at=record.updated,
     )
 
+def db_puntuar(puntuacion: Puntuacion):
+    client = db_get_client()
+    last_id = 1
+    last_puntuacion = client.collection("Puntuacion").get_list(
+        page=1,
+        per_page=1,
+        query_params={
+            "sort": "-pk_id_puntuacion"
+        }
+    )
+    if last_puntuacion.items:
+        last_id = int(last_puntuacion.items[0].pk_id_puntuacion) + 1
+
+    puntuacion_item = client.collection("Puntuacion").create(
+                        {
+                            "pk_id_puntuacion": last_id,
+                            "fk_id_libro": puntuacion.fk_id_libro,
+                            "fk_id_usuario": puntuacion.fk_id_usuario,
+                            "puntuacion": puntuacion.puntuacion
+                        }
+                    )
+
+    puntuaciones = client.collection("Puntuacion").get_list(
+        query_params={
+            "filter": f'fk_id_libro="{puntuacion.fk_id_libro}"'
+        }
+    )
+    p = []
+    for puntuacion in puntuaciones.items:
+        p.append(puntuacion.puntuacion) 
+    if len(p):
+        promedio = sum(p) / len(p)
+    else:
+        promedio = 0
+    promedio = round(promedio)
+    update_libro_puntuacion(puntuacion.fk_id_libro, promedio)
+
+    return puntuacion_item
+
+def update_libro_puntuacion(idlibro, promedio):
+    client = db_get_client()
+    libro = client.collection('Libros').get_one(idlibro)
+
+    libro_actualizado = Libro(
+        id=libro.id,
+        pk_id_libro=libro.pk_id_libro,
+        titulo=libro.titulo,
+        autor=libro.autor,
+        descripcion= libro.descripcion,
+        fecha_publicacion=libro.fecha_publicacion,
+        ruta_img=None,
+        copias=int(libro.copias)-1 if libro.copias is not None else 0,
+        fk_id_departamento=libro.fk_id_departamento,
+        fk_id_genero=libro.fk_id_genero,
+        estrellas=promedio,
+        created_at=libro.created,
+        updated_at=None,
+    )
+
+    db_update_libro(libro_actualizado)
 
 
 def db_get_libro(pk_id_libro: int) -> Libro:
@@ -113,7 +173,7 @@ def db_get_libro(pk_id_libro: int) -> Libro:
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
-        estrellas=int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
+        estrellas=int(record.estrellas) if record.estrellas is not None else 0,
         created_at=record.created,
         updated_at=record.updated,
     )
@@ -168,7 +228,7 @@ def db_update_libro(libro: Libro):
         "copias": libro.copias,
         "fk_id_departamento": libro.fk_id_departamento,
         "fk_id_genero": generos,
-        "estrellas":int(libro.estrellas) if libro.estrellas is not None and libro.estrellas.isdigit() else 0,
+        "estrellas":int(libro.estrellas) if libro.estrellas is not None else 0,
         "updated_at": libro.updated_at,
     }
 
@@ -191,7 +251,7 @@ def db_update_libro(libro: Libro):
         copias=record.copias,
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
-        estrellas=int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
+        estrellas=int(record.estrellas) if record.estrellas is not None else 0,
         created_at=record.created,
         updated_at=record.updated,
     )
@@ -252,7 +312,7 @@ def db_get_all_libros(cantidad: int) -> List:
             "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
             "copias": record.copias,
             "genero": genero_nombre,
-            "estrellas": int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
+            "estrellas": int(record.estrellas) if record.estrellas is not None else 0,
             "departamento_numero": departamento_numero,
             "departamento": nombre_departamento,
         }
@@ -302,7 +362,7 @@ def db_get_libros_paginados(limit: int, offset: int) -> List:
             "ruta_img": f"{base_url}/api/files/{collection_id}/{record.id}/{record.ruta_img}",
             "copias": record.copias,
             "genero": genero_nombre,
-            "estrellas": int(record.estrellas) if record.estrellas is not None and record.estrellas.isdigit() else 0,
+            "estrellas": int(record.estrellas) if record.estrellas is not None else 0,
             "departamento_numero": departamento_numero,
             "departamento": nombre_departamento,
         }
@@ -343,7 +403,7 @@ def db_get_all() -> List[Libro]:
                  copias=r.copias,
                  fk_id_departamento=r.fk_id_departamento,
                  fk_id_genero=r.fk_id_genero,
-                 estrellas=int(r.estrellas) if r.estrellas is not None and r.estrellas.isdigit() else 0,
+                 estrellas=int(r.estrellas) if r.estrellas is not None else 0,
                  created_at=r.created,
                  updated_at=r.updated,
             )
@@ -424,7 +484,7 @@ def db_get_libros_lista_paginados(limit, offset, q=None) -> Dict:
                  copias=r.copias,
                  fk_id_departamento=r.fk_id_departamento,
                  fk_id_genero=r.fk_id_genero,
-                 estrellas=int(r.estrellas) if r.estrellas is not None and r.estrellas.isdigit() else 0,
+                 estrellas=int(r.estrellas) if r.estrellas is not None else 0,
                  created_at=r.created,
                  updated_at=r.updated,
             )
