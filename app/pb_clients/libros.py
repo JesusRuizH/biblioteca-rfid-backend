@@ -403,7 +403,7 @@ def db_get_all() -> List[Libro]:
                  copias=r.copias,
                  fk_id_departamento=r.fk_id_departamento,
                  fk_id_genero=r.fk_id_genero,
-                 estrellas=int(r.estrellas) if r.estrellas is not None else 0,
+                 estrellas=int(r.estrellas) if r.estrellas and r.estrellas.isdigit() else 0,
                  created_at=r.created,
                  updated_at=r.updated,
             )
