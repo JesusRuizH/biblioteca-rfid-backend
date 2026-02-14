@@ -410,6 +410,42 @@ def db_get_all() -> List[Libro]:
         )
     return libros_list
 
+def db_get_all_para_recomendador() -> List[dict]:
+    client = db_get_client()
+    records = client.collection("Libros").get_full_list(
+        query_params={
+            "expand": "fk_id_genero,fk_id_departamento"
+        }
+    )
+    libros = []
+    for r in records:
+        generos = r.expand.get("fk_id_genero", []) if r.expand else []
+        depto = r.expand.get("fk_id_departamento", None) if r.expand else None
+
+        # Género: lista de Records, el campo se llama 'genero'
+        if isinstance(generos, list) and len(generos) > 0:
+            genero_nombre = generos[0].__dict__.get("genero", "Desconocido")
+        else:
+            genero_nombre = "Desconocido"
+
+        # Departamento: relación simple, revisa cómo se llama el campo nombre
+        if depto and hasattr(depto, "__dict__"):
+            departamento_nombre = depto.__dict__.get("nombre", 
+                                  depto.__dict__.get("departamento", "Desconocido"))
+        else:
+            departamento_nombre = "Desconocido"
+
+        libros.append({
+            "pk_id_libro": r.__dict__.get("pk_id_libro"),
+            "titulo": r.__dict__.get("titulo"),
+            "autor": r.__dict__.get("autor"),
+            "genero_nombre": genero_nombre,
+            "departamento_nombre": departamento_nombre,
+            "estrellas": str(r.__dict__.get("estrellas", "")) or "Desconocido",
+             "fecha_publicacion": r.__dict__.get("fecha_publicacion", ""),
+        })
+    return libros
+
 def db_get_libros_lista_paginados(limit, offset, q=None) -> Dict:
     page = (offset // limit) + 1
 
