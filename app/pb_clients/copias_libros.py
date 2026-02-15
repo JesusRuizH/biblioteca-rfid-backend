@@ -9,22 +9,37 @@ from app.pb_clients.libros import (
     db_update_libro
 )
 
+def db_get_last_id_copia_libro() -> int:
+    client = db_get_client()
+    last_copia = client.collection("CopiasLibro").get_list(
+        page=1,
+        per_page=1,
+        query_params={
+            "sort": "-pk_id_copia"
+        }
+    )
+    if not last_copia.items:
+        return 0
+    return last_copia.items[0].pk_id_copia
+
 def db_create_copia_libro(copia_libro: CopiaLibro) -> CopiaLibro:
     client = db_get_client()
+    last_copia = db_get_last_id_copia_libro()
     copia = copia_libro.model_dump(mode="json")
     record = client.collection("CopiasLibro").create({
-                                                "pk_id_copia": copia['pk_id_copia'],
-                                                "fk_id_libro": copia['fk_id_libro'],
-                                                "isbn": copia['isbn'],
-                                                "rfid_tag": copia['rfid_tag'],
-                                                "disponibilidad": copia['disponibilidad'],
-                                                })
+                                            "pk_id_copia": last_copia + 1,
+                                            "fk_id_libro": copia_libro.fk_id_libro,
+                                            "isbn": copia_libro.isbn,
+                                            "rfid_tag": copia_libro.rfid_tag,
+                                            "disponibilidad": copia_libro.disponibilidad,
+                                            })
+
 
     
 
     libro = client.collection('Libros').get_one(copia['fk_id_libro'])
 
-    print(libro.estrellas)
+    print(libro.copias)
 
     libro_actualizado = Libro(
         id=libro.id,

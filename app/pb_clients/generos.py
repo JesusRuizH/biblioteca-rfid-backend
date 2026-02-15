@@ -15,12 +15,14 @@ def db_create_genero(genero: Generos) -> Generos:
     client = db_get_client()
     direccion_img = genero.icon
 
+    last_id = db_get_last_id_genero()
+
     filename = os.path.basename(direccion_img)
     with open(direccion_img, "rb") as f:
         file_upload = FileUpload(filename, f)
         genero_record = client.collection("Generos").create(
             {
-                "pk_id_genero": genero.pk_id_genero,
+                "pk_id_genero":  last_id + 1, # genero.pk_id_genero, antes de actualizacion
                 "genero": genero.genero,
                 "created_at": genero.created_at,
                 "updated_at": genero.updated_at,
@@ -114,3 +116,17 @@ def db_delete_genero(pk_id_genero: int) -> Response:
     )
     response = client.collection("Generos").delete(genero_record.id)
     return response
+
+
+def db_get_last_id_genero() -> int:
+    client = db_get_client()
+    last_genero = client.collection("Generos").get_list(
+        page=1,
+        per_page=1,
+        query_params={
+            "sort": "-pk_id_genero"
+        }
+    )
+    if not last_genero.items:
+        return 0
+    return last_genero.items[0].pk_id_genero
