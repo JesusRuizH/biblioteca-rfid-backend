@@ -17,10 +17,15 @@ import base64
 import requests
 from pocketbase.client import FileUpload
 
-def db_create_libro(libro: Libro):
+def db_create_libro(libro: Libro, recargar):
     client = db_get_client()
     direccion_img = libro.ruta_img
     file_upload = None
+
+    print(f"Libro: {libro}")
+
+    ultimo_id = db_get_last_id_libro()
+    ultimo_id = ultimo_id + 1
 
     if not direccion_img:
         raise ValueError("No se recibió ninguna imagen")
@@ -61,7 +66,7 @@ def db_create_libro(libro: Libro):
     # Crear registro en PocketBase
     record = client.collection("Libros").create(
         {
-            "pk_id_libro": libro.pk_id_libro,
+            "pk_id_libro": ultimo_id, # libro.pk_id_libro antes de actualizacion
             "titulo": libro.titulo,
             "autor": libro.autor,
             "descripcion": libro.descripcion,
@@ -75,6 +80,8 @@ def db_create_libro(libro: Libro):
             "updated_at": libro.updated_at,
         }
     )
+
+    # recargar() Desbloquear despues de llenado de base de datos
 
     # Devolver objeto Libro con los datos guardados en PB
     return Libro(
@@ -256,7 +263,7 @@ def db_update_libro(libro: Libro):
         updated_at=record.updated,
     )
 
-def db_delete_libro(pk_id_libro: int) -> Response:
+def db_delete_libro(pk_id_libro: int, recargar) -> Response:
     client = db_get_client()
     libro = client.collection("Libros").get_first_list_item(
         f'pk_id_libro="{pk_id_libro}"'
@@ -275,7 +282,8 @@ def db_delete_libro(pk_id_libro: int) -> Response:
         for record_prestamo in prestamo:
             client.collection("Prestamos").delete(record_prestamo.id)
         client.collection("CopiasLibro").delete(record_copia_libro.id)
-
+        
+    recargar()
     return client.collection("Libros").delete(libro.id)
 
 
@@ -403,7 +411,7 @@ def db_get_all() -> List[Libro]:
                  copias=r.copias,
                  fk_id_departamento=r.fk_id_departamento,
                  fk_id_genero=r.fk_id_genero,
-                 estrellas=int(r.estrellas) if r.estrellas and r.estrellas.isdigit() else 0,
+                 estrellas=int(r.estrellas) if r.estrellas else 0,
                  created_at=r.created,
                  updated_at=r.updated,
             )
@@ -455,10 +463,6 @@ def db_get_libros_lista_paginados(limit, offset, q=None) -> Dict:
         q = q.strip()
 
         filter_expr = (
-            f'titulo ~ "{q}" || '
-            f'autor ~ "{q}" || '
-            if q.isdigit()
-            else
             f'titulo ~ "{q}" || autor ~ "{q}"'
         )
 

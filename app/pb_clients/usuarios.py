@@ -13,9 +13,33 @@ from datetime import datetime, timedelta
 from collections import Counter
 
 
+def db_get_last_id_usuario() -> int:
+    client = db_get_client()
+    last_usuario = client.collection("Usuarios").get_list(
+        page=1,
+        per_page=1,
+        query_params={
+            "sort": "-pk_id_usuario"
+        }
+    )
+    if not last_usuario.items:
+        return 0
+    return last_usuario.items[0].pk_id_usuario
+
 def db_create_usuario(usuario: Usuario) -> Usuario:
     client = db_get_client()
-    record = client.collection("Usuarios").create(usuario.model_dump(mode="json"))
+    last_usuario = db_get_last_id_usuario()
+
+    record = client.collection("Usuarios").create({
+            "pk_id_usuario": last_usuario + 1,
+            "nombre_usuario": usuario.nombre_usuario.title(),
+            "password": usuario.password,
+            "passwordConfirm":usuario.passwordConfirm,
+            "email": usuario.email.lower(),
+            "verified": usuario.verified,
+            "fk_id_tipo_usuario": usuario.fk_id_tipo_usuario
+        })
+    
     return Usuario(
         id=record.id,
         pk_id_usuario=record.pk_id_usuario,

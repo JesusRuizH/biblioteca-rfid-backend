@@ -19,9 +19,34 @@ LIBROS_CACHE: List
 CACHE_LAST_UPDATE = 0
 CACHE_TTL = 60  # segundos (ej: 1 minuto)
 
+def db_get_last_id_prestamo() -> int:
+    client = db_get_client()
+    last_prestamo = client.collection("Prestamos").get_list(
+        page=1,
+        per_page=1,
+        query_params={
+            "sort": "-pk_id_prestamo"
+        }
+    )
+    if not last_prestamo.items:
+        return 0
+    return last_prestamo.items[0].pk_id_prestamo
+
 def db_create_prestamo(prestamo: Prestamo) -> Prestamo:
     client = db_get_client()
-    record = client.collection("Prestamos").create(prestamo.model_dump(mode="json"))
+    last_prestamo = db_get_last_id_prestamo()
+    
+    record = client.collection("Prestamos").create(
+            {
+                "pk_id_prestamo":  last_prestamo + 1, # genero.pk_id_genero, antes de actualizacion
+                "fk_id_copia": prestamo.fk_id_copia,
+                "fk_id_usuario": prestamo.fk_id_usuario,
+                "fecha_prestamo": prestamo.fecha_prestamo,
+                "fecha_entrega": prestamo.fecha_entrega,
+                "dias_restantes": prestamo.dias_restantes,
+                "estatus_entrega": prestamo.estatus_entrega
+            },
+        )
 
     return Prestamo(
         id=record.id,

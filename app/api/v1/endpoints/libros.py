@@ -6,6 +6,8 @@ from app.pb_clients.libros import db_get_libro, db_create_libro, db_delete_libro
     db_get_all, db_get_last_id_libro, db_get_libros_paginados, db_get_libros_lista_paginados, db_puntuar
 from app.models.db_models import Libro, Puntuacion
 
+from app.api.v1.endpoints.recomendador import recargar
+
 router = APIRouter(
     prefix="/libro",
     tags=["Libros"],  # Grouped under "Prestamos" in Swagger UI
@@ -40,7 +42,7 @@ def get_list_libros(
 
 @router.get("/ultimo_libro_id", response_model=int, summary="Get last registered book")
 @router.get("/ultimo_libro_id/", response_model=int, summary="Get last registered book")
-def api_db_get_estadisticas_admin_panel_a():
+def api_get_last_id_libro():
     """
     Fetch a single usuario by its ID.
 
@@ -94,7 +96,7 @@ def api_get_all_libros(cantidad: int):
 def api_create_prestamo(libro: Libro):
     # Aquí guardarías a la base de datos o llamas a otra función
     try:
-        return db_create_libro(libro)
+        return db_create_libro(libro, recargar)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
     
@@ -118,7 +120,7 @@ def api_delete_libro(pk_id_libro: int):
     - **pk_id_libro**: The ID of the book to delete.
     """
     try:
-        db_delete_libro(pk_id_libro)
+        db_delete_libro(pk_id_libro, recargar)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
