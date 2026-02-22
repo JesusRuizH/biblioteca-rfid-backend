@@ -5,6 +5,8 @@ from requests.models import Response
 from app.core.auth import db_get_client
 from app.models.db_models import CopiaLibro, Libro
 
+from app.core.config import settings
+
 from app.pb_clients.libros import (
     db_update_libro
 )
@@ -101,7 +103,7 @@ def db_get_ultimo_id_copia() -> int:
     return last_copy.items[0].pk_id_copia
 
 def db_get_all_copies() -> List:
-    base_url = "http://localhost:8090"
+    base_url = f"{settings.POCKETBASE_URL_IMAGENES}" #"http://localhost:8090"
     collection_id = "pbc_2270877598"
     client = db_get_client()
     record = client.collection("CopiasLibro").get_full_list(
@@ -133,7 +135,7 @@ def db_get_all_copies() -> List:
 def db_get_copias_paginadas(limit, offset, q=None) -> Dict:
     page = (offset // limit) + 1
 
-    base_url = "http://localhost:8090"
+    base_url = f"{settings.POCKETBASE_URL_IMAGENES}" #"http://localhost:8090"
     collection_id = "pbc_2270877598"
     client = db_get_client()
 
