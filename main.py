@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import prestamos, libros, copias_libros, usuarios, departamentos, tipo_usuario, generos, recomendador, estadisticas
+from app.api.v1.endpoints import prestamos, libros, copias_libros, usuarios, departamentos, tipo_usuario, generos, recomendador, estadisticas, recomendaciones_usuario
 
 app = FastAPI(
     title="Biblio RFID API",
@@ -25,3 +25,4 @@ app.include_router(tipo_usuario.router)
 app.include_router(generos.router)
 app.include_router(recomendador.router)
 app.include_router(estadisticas.router)
+app.include_router(recomendaciones_usuario.router)
