@@ -10,3 +10,5 @@ pydantic-settings
 pandas
 numpy
 scikit-learn
+sendgrid
+apscheduler

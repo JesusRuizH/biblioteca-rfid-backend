@@ -1,12 +1,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.endpoints import prestamos, libros, copias_libros, usuarios, departamentos, tipo_usuario, generos, recomendador, estadisticas, recomendaciones_usuario
+from contextlib import asynccontextmanager
+from app.schedulers.scheduler import start_scheduler, scheduler, get_admin_token, check_expiring_loans
+from app.core.config import settings
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.SCHEDULER_ENABLED:
+        await get_admin_token()
+        start_scheduler()
+    yield
+    if settings.SCHEDULER_ENABLED:
+        scheduler.shutdown()
 
 app = FastAPI(
     title="Biblio RFID API",
     description="API for managing library loans using RFID",
     version="1.0.0",
+    lifespan= lifespan
 )
+
 
 app.add_middleware(
     CORSMiddleware,
