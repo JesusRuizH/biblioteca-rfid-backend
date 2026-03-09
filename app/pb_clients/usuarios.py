@@ -146,8 +146,8 @@ def db_auth_usuario(email: str, password: str) -> Usuario:
         verified=record.verified,
         fk_id_tipo_usuario= rol,
         fecha_nacimiento=record.fecha_nacimiento,
-        created_at=record.created,
-        updated_at=record.updated,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
     )
 
 def db_auth_admin(email: str, password: str) -> Usuario:

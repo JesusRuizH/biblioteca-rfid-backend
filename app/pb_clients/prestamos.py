@@ -1,6 +1,6 @@
 from collections import Counter
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from requests.models import Response
 
@@ -188,45 +188,61 @@ def db_get_mis_prestamos_pendientes(pk_id_usuario: int) -> List:
         mis_prestamos.append(libro_top)
     return mis_prestamos
 
-def db_get_historial_prestamos(pk_id_usuario: int) -> List:
+def db_get_historial_prestamos(fk_id_usuario: str, limit: int) -> List:
     client = db_get_client()
-    usuario = db_get_usuario(pk_id_usuario)
+    
+    # En get_list(page, per_page, options):
+    # Usamos page=1 y per_page=limit para obtener exactamente la cantidad deseada.
     prestamos = client.collection("Prestamos").get_list(
         1,
-        20,
+        limit,
         {
-            "filter": f'fk_id_usuario = "{usuario.id}"',
-            "expand": "fk_id_copia.fk_id_libro.fk_id_genero"
+            "filter": f'fk_id_usuario = "{fk_id_usuario}"',
+            "expand": "fk_id_copia.fk_id_libro.fk_id_genero",
+            "sort": "-created_at"  # Trae los más nuevos primero
         }
     )
+    
     mis_prestamos = []
 
     for prestamo in prestamos.items:
-        titulo_libro = ""
-        autor = ""
+        titulo_libro = "Sin título"
+        autor = "Desconocido"
         genero_lista = []
-        copia = prestamo.expand.get("fk_id_copia")
+        
+        # Acceso seguro a los niveles de expansión
+        expand_prestamo = getattr(prestamo, "expand", {})
+        copia = expand_prestamo.get("fk_id_copia")
+        
         if copia:
-            libro = copia.expand.get("fk_id_libro")
+            expand_copia = getattr(copia, "expand", {})
+            libro = expand_copia.get("fk_id_libro")
+            
             if libro:
-                titulo_libro = libro.titulo
-                autor = libro.autor
-                generos = libro.expand.get("fk_id_genero")
+                titulo_libro = getattr(libro, "titulo", titulo_libro)
+                autor = getattr(libro, "autor", autor)
+                
+                expand_libro = getattr(libro, "expand", {})
+                generos = expand_libro.get("fk_id_genero")
+                
                 if generos:
-                    for genero in generos:
-                        genero_lista.append(genero.genero)
-
+                    # Manejo si generos es una lista (relación múltiple)
+                    if isinstance(generos, list):
+                        genero_lista = [getattr(g, "genero", "") for g in generos]
+                    else:
+                        genero_lista = [getattr(generos, "genero", "")]
 
         libros_prestados = {
-            "pk_id_prestamo": prestamo.pk_id_prestamo,
+            "id": getattr(prestamo, "pk_id_prestamo", prestamo.id),
             "titulo": titulo_libro,
             "autor": autor,
             "genero": genero_lista,
-            "fecha_prestamo": prestamo.fecha_prestamo,
-            "fecha_entrega": prestamo.fecha_entrega,
-            "estatus_entrega": prestamo.estatus_entrega,
+            "fecha_prestamo": getattr(prestamo, "fecha_prestamo", ""),
+            "fecha_devolucion": getattr(prestamo, "fecha_entrega", ""),
+            "estatus_entrega": "En préstamo" if not getattr(prestamo, "estatus_entrega", False) else "Devuelto",
         }
         mis_prestamos.append(libros_prestados)
+        
     return mis_prestamos
 
 def db_get_mis_recomendaciones(pk_id_usuario: int) -> List: 
@@ -288,6 +304,98 @@ def db_get_total_prestamos() -> int:
 
     return total_count
 
+def db_get_total_mis_prestamos(fk_id_usuario: str) -> Dict:
+    client = db_get_client()
+    
+    # Aplicamos el filtro para que el conteo sea solo de ese usuario
+    # El filtro usa sintaxis de PocketBase: "campo = 'valor'"
+    result = client.collection("Prestamos").get_list(1, 1, {
+        "filter": f'fk_id_usuario = "{fk_id_usuario}"'
+    })
+    
+    total_count = result.total_items
+    print(f"Total Prestamos para el usuario {fk_id_usuario}: {total_count}")
+
+    return {"total": total_count}
+
+
+def db_get_historial_paginado(offset: int, limit: int) -> Tuple[List[Dict], int]:
+    """
+    Retorna el historial de préstamos de manera paginada.
+    Retorna una tupla: (lista_de_prestamos, total_de_items_en_db)
+    """
+    client = db_get_client()
+    page = (offset // limit) + 1
+    
+    # PocketBase get_list(page, perPage, options)
+    # page: El número de página (empieza en 1)
+    # per_page: Cuántos registros traer
+    response = client.collection("Prestamos").get_list(
+        page,
+        limit,
+        {
+            "expand": "fk_id_copia.fk_id_libro.fk_id_genero, fk_id_usuario",
+            "sort": "-created_at" 
+        }
+    )
+    
+    mis_prestamos = []
+    print(response.items)
+    for prestamo in response.items:
+        
+        titulo_libro = "Desconocido"
+        autor = "Desconocido"
+        nombre_usuario = "Desconocido"
+        correo_usuario = "Desconocido"
+        id_usuario = "Desconocido"
+        genero_lista = []
+        
+        # Navegación segura por los niveles de expand
+        expand_p = getattr(prestamo, "expand", {})
+        copia = expand_p.get("fk_id_copia")
+        usuario = expand_p.get("fk_id_usuario")
+        
+        if usuario:
+            nombre_usuario = usuario.nombre_usuario
+            correo_usuario = usuario.email
+            id_usuario = usuario.pk_id_usuario
+
+        if copia:
+            expand_c = getattr(copia, "expand", {})
+            libro = expand_c.get("fk_id_libro")
+            
+            if libro:
+                titulo_libro = getattr(libro, "titulo", "")
+                autor = getattr(libro, "autor", "")
+                
+                expand_l = getattr(libro, "expand", {})
+                generos = expand_l.get("fk_id_genero")
+                
+                if generos:
+                    # PocketBase devuelve una lista si es relación múltiple o un objeto si es única
+                    if isinstance(generos, list):
+                        genero_lista = [g.get("genero") if isinstance(g, dict) else getattr(g, "genero", "") for g in generos]
+                    else:
+                        genero_lista = [getattr(generos, "genero", "")]
+
+        libros_prestados = {
+            "usuario": nombre_usuario,
+            "email": correo_usuario,
+            "id_usuario": id_usuario,
+            "pk_id_prestamo": prestamo.id, # O prestamo.pk_id_prestamo si es un campo manual
+            "titulo": titulo_libro,
+            "autor": autor,
+            "genero": genero_lista,
+            "fecha_prestamo": getattr(prestamo, "fecha_prestamo", ""),
+            "fecha_entrega": getattr(prestamo, "fecha_entrega", ""),
+            "estatus_entrega": getattr(prestamo, "estatus_entrega", False),
+            "isbn": copia.isbn,
+            "rfid_tag": copia.rfid_tag
+        }
+        mis_prestamos.append(libros_prestados)
+    
+    # Retornamos los datos procesados y el total de registros (totalItems)
+    return mis_prestamos, response.total_items
 
 def db_get_historial_prestamos_admin(cantidad: int) -> List:
     client = db_get_client()
@@ -417,20 +525,58 @@ def db_get_generos_leidos_admin() -> List:
 
     return conteos_mensuales
 
-
-def db_get_prestamos_por_mes(pk_id_usuario: int) -> Dict:
+def db_get_generos_leidos_usuario(fk_id_usuario: str) -> List:
     client = db_get_client()
-    usuario = db_get_usuario(pk_id_usuario)
+    prestamos = client.collection("Prestamos").get_list(
+        1,
+        50,
+        {
+            "expand": "fk_id_copia.fk_id_libro.fk_id_genero",
+            "filter": f'fk_id_usuario = "{fk_id_usuario}"'
+        }
+    )
+
+    genero_lista = []
+    for prestamo in prestamos.items:
+        copia = prestamo.expand.get("fk_id_copia")
+        if copia:
+            libro = copia.expand.get("fk_id_libro")
+            if libro:
+                generos = libro.expand.get("fk_id_genero")
+                if generos:
+                    for genero in generos:
+                        genero_lista.append(genero.genero)
+
+    conteo_generos = Counter(genero_lista)
+    conteos_mensuales = []
+    for gnere, count in conteo_generos.items():
+        print(gnere, count)
+        obj_cont_mensual = { "genero": gnere, "total": count }
+        conteos_mensuales.append(obj_cont_mensual)
+
+    return conteos_mensuales
+
+
+
+def db_get_prestamos_por_mes(pk_id_usuario: str) -> Dict:
+    client = db_get_client()
     prestamos = client.collection("Prestamos").get_list(
         1,
         20,
         {
-            "filter": f'fk_id_usuario = "{usuario.id}"'
+            "filter": f'fk_id_usuario = "{pk_id_usuario}"'
         }
     )
-    months = [datetime.fromisoformat(r.created_at.replace("Z", "+00:00")).strftime("%Y-%m") for r in  prestamos.items]
+    months = [datetime.fromisoformat(r.created_at.replace("Z", "+00:00")).strftime("%B") for r in  prestamos.items]
     conteo_por_mes = Counter(months)
-    return conteo_por_mes
+    conteos_mensuales = []
+    for month, count in conteo_por_mes.items():
+        print(month, count)
+        conteos_mensuales = []
+        obj_cont_mensual = { "mes": month, "prestamos": count }
+        conteos_mensuales.append(obj_cont_mensual)
+
+    return conteos_mensuales
 
 def db_get_prestamos_por_mes_admin() -> List:
     client = db_get_client()

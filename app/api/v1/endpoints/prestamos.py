@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Optional, Dict
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Query
 from pydantic import BaseModel
 
 from app.pb_clients.prestamos import (
@@ -17,9 +17,12 @@ from app.pb_clients.prestamos import (
     db_get_historial_prestamos_admin,
     db_get_generos_leidos_admin,
     db_get_total_prestamos,
+    db_get_total_mis_prestamos,
     db_get_last_id_prestamos,
     get_libros_cache,
-    db_get_mis_recomendaciones
+    db_get_mis_recomendaciones,
+    db_get_historial_paginado,
+    db_get_generos_leidos_usuario
 )
 from app.models.db_models import Prestamo
 
@@ -32,6 +35,33 @@ router = APIRouter(
 class PrestamoMes(BaseModel):
     mes: str
     prestamos: int
+
+@router.get("/get_historial_paginado/", response_model=[], summary="Get historial páginado")
+@router.get("/get_historial_paginado", response_model=[], summary="Get historial páginado")
+def get_list_libros(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1),
+):
+    """
+    Obtenemos los usuarios por páginación
+    """
+    try:
+        return db_get_historial_paginado(offset, limit)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/total_mis_prestamos/{fk_id_usuario}", response_model=Dict, summary="Get a count of full loans")
+def api_db_get_total_mis_prestamos(fk_id_usuario :str):
+    """
+    Fetch a single préstamo (loan) by its ID.
+
+    - **top**: Recupera el top de libros indicado por el usuario.
+    """
+    try:
+        return db_get_total_mis_prestamos(fk_id_usuario)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
 @router.get("/prestamos_totales/", response_model=int, summary="Get a count of full loans")
 @router.get("/prestamos_totales", response_model=int, summary="Get a count of full loans")
 def api_db_get_total_prestamos():
@@ -67,6 +97,18 @@ def api_db_get_generos_leidos_admin():
     """
     try:
         return db_get_generos_leidos_admin()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
+@router.get("/generos_leidos_usuario/{fk_id_usuario}", response_model=[], summary="get gnre based on pk_id_usuario ")
+def api_db_get_generos_leidos_usuario(fk_id_usuario: str):
+    """
+    Fetch a single préstamo (loan) by its ID.
+
+    - **pk_id_usuario**: Recupera prestamos pendientes por usuario en base a su ID
+    """
+    try:
+        return db_get_generos_leidos_usuario(fk_id_usuario)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -133,31 +175,40 @@ def api_db_get_mis_prestamos_pendientes(pk_id_usuario: int):
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-@router.get("/mis_prestamos_por_mes/{pk_id_usuario}", response_model=[], summary="get loans based on pk_id_usuario ")
-def api_db_get_prestamos_por_mes(pk_id_usuario: int):
+@router.get("/mis_prestamos_por_mes/{fk_id_usuario}", response_model=[], summary="get loans based on fk_id_usuario ")
+def api_db_get_prestamos_por_mes(fk_id_usuario: str):
     """
     Fetch a single préstamo (loan) by its ID.
 
-    - **pk_id_usuario**: Recupera prestamos pendientes por usuario en base a su ID
+    - **fk_id_usuario**: Recupera prestamos pendientes por usuario en base a su ID
     """
     try:
-        return db_get_prestamos_por_mes(pk_id_usuario)
+        return db_get_prestamos_por_mes(fk_id_usuario)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
     
 
-
-@router.get("/historial_prestamos/{pk_id_usuario}", response_model=[], summary="get loans based on pk_id_usuario ")
-def api_db_get_historial_prestamos(pk_id_usuario: int):
+@router.get("/historial_prestamos/{fk_id_usuario}", summary="Obtener historial de préstamos por ID de usuario")
+def api_db_get_historial_prestamos(
+    fk_id_usuario: str, 
+    limit: int = Query(10, gt=0, le=100) # Valor por defecto 10, mínimo 1, máximo 100
+):
     """
-    Fetch a single préstamo (loan) by its ID.
-
-    - **pk_id_usuario**: Recupera prestamos pendientes por usuario en base a su ID
+    Recupera los préstamos de un usuario.
+    
+    - **fk_id_usuario**: ID único del usuario en PocketBase.
+    - **limit**: Cantidad de registros a recuperar (parámetro de consulta).
     """
     try:
-        return db_get_historial_prestamos(pk_id_usuario)
+        # Validamos que el límite no llegue en 0 a la función de base de datos
+        res = db_get_historial_prestamos(fk_id_usuario, limit)
+        if not res:
+            # Si no hay préstamos, devolvemos lista vacía (esto no es un error 404)
+            return []
+        return res
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        # Si algo falla en la conexión o lógica
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     
 @router.get("/mis_recomendaciones/{pk_id_usuario}", response_model=[], summary="get loans based on pk_id_usuario ")
 def api_db_get_mis_recomendaciones(pk_id_usuario: int):
