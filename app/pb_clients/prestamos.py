@@ -239,7 +239,7 @@ def db_get_historial_prestamos(fk_id_usuario: str, limit: int) -> List:
             "genero": genero_lista,
             "fecha_prestamo": getattr(prestamo, "fecha_prestamo", ""),
             "fecha_devolucion": getattr(prestamo, "fecha_entrega", ""),
-            "estatus_entrega": "En préstamo" if not getattr(prestamo, "estatus_entrega", False) else "Devuelto",
+            "estado": "En préstamo" if not getattr(prestamo, "estatus_entrega", False) else "Devuelto",
         }
         mis_prestamos.append(libros_prestados)
         
