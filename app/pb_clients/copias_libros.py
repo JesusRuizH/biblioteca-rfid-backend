@@ -301,7 +301,7 @@ def db_delete_copia_libro(pk_id_copia: int) -> Response:
         descripcion= libro.descripcion,
         fecha_publicacion=libro.fecha_publicacion,
         ruta_img=None,
-        copias=int(libro.copias)-1 if libro.copias is not None else 0,
+        copias=int(libro.copias)-1 if libro.copias is not None and int(libro.copias) >= 0 else 0,
         fk_id_departamento=libro.fk_id_departamento,
         fk_id_genero=libro.fk_id_genero,
         estrellas=int(libro.estrellas),
