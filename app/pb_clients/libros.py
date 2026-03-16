@@ -81,7 +81,7 @@ def db_create_libro(libro: Libro, recargar):
         }
     )
 
-    # recargar() Desbloquear despues de llenado de base de datos
+    recargar() #Desbloquear despues de llenado de base de datos
 
     # Devolver objeto Libro con los datos guardados en PB
     return Libro(
@@ -96,8 +96,8 @@ def db_create_libro(libro: Libro, recargar):
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,  # 👉 PB devuelve lista
         estrellas=int(record.estrellas) if record.estrellas is not None else 0,
-        created_at=record.created,
-        updated_at=record.updated,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
     )
 
 def db_puntuar(puntuacion: Puntuacion):
@@ -155,7 +155,7 @@ def update_libro_puntuacion(idlibro, promedio):
         fk_id_departamento=libro.fk_id_departamento,
         fk_id_genero=libro.fk_id_genero,
         estrellas=promedio,
-        created_at=libro.created,
+        created_at=libro.created_at,
         updated_at=None,
     )
 
@@ -181,8 +181,8 @@ def db_get_libro(pk_id_libro: int) -> Libro:
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
         estrellas=int(record.estrellas) if record.estrellas is not None else 0,
-        created_at=record.created,
-        updated_at=record.updated,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
     )
 
 def db_update_libro(libro: Libro):
@@ -259,8 +259,8 @@ def db_update_libro(libro: Libro):
         fk_id_departamento=record.fk_id_departamento,
         fk_id_genero=record.fk_id_genero,
         estrellas=int(record.estrellas) if record.estrellas is not None else 0,
-        created_at=record.created,
-        updated_at=record.updated,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
     )
 
 def db_delete_libro(pk_id_libro: int, recargar) -> Response:
@@ -412,8 +412,8 @@ def db_get_all() -> List[Libro]:
                  fk_id_departamento=r.fk_id_departamento,
                  fk_id_genero=r.fk_id_genero,
                  estrellas=int(r.estrellas) if r.estrellas else 0,
-                 created_at=r.created,
-                 updated_at=r.updated,
+                 created_at=r.created_at,
+                 updated_at=r.updated_at,
             )
         )
     return libros_list
@@ -489,8 +489,8 @@ def db_get_libros_lista_paginados(limit, offset, q=None) -> Dict:
                  fk_id_departamento=r.fk_id_departamento,
                  fk_id_genero=r.fk_id_genero,
                  estrellas=int(r.estrellas) if r.estrellas is not None else 0,
-                 created_at=r.created,
-                 updated_at=r.updated,
+                 created_at=r.created_at,
+                 updated_at=r.updated_at,
             )
         )
 

@@ -1,8 +1,12 @@
 from typing import List
 from collections import Counter
+from app.models.db_models import Libro, Prestamo
 
 from app.core.auth import db_get_client
 
+from app.pb_clients.libros import (
+    db_update_libro
+)
 from app.core.config import settings
 
 
@@ -65,3 +69,105 @@ def db_get_top_libros(top: int) -> List:
             break
     return top_libros
 
+def restar_copia_libro(fk_id_libro: str) -> Libro: 
+    client = db_get_client()
+    libro = client.collection('Libros').get_one(fk_id_libro)
+
+    libro_actualizado = Libro(
+        id=libro.id,
+        pk_id_libro=libro.pk_id_libro,
+        titulo=libro.titulo,
+        autor=libro.autor,
+        descripcion= libro.descripcion,
+        fecha_publicacion=libro.fecha_publicacion,
+        ruta_img=None,
+        copias=int(libro.copias)-1 if libro.copias is not None and int(libro.copias) > 0 else 0,
+        fk_id_departamento=libro.fk_id_departamento,
+        fk_id_genero=libro.fk_id_genero,
+        estrellas=int(libro.estrellas),
+        created_at=libro.created,
+        updated_at=None,
+    )
+
+    db_update_libro(libro_actualizado)
+
+
+    return libro_actualizado
+
+def sumar_copia_libro(fk_id_libro: str) -> Libro: 
+    client = db_get_client()
+    libro = client.collection('Libros').get_one(fk_id_libro)
+
+    libro_actualizado = Libro(
+        id=libro.id,
+        pk_id_libro=libro.pk_id_libro,
+        titulo=libro.titulo,
+        autor=libro.autor,
+        descripcion= libro.descripcion,
+        fecha_publicacion=libro.fecha_publicacion,
+        ruta_img=None,
+        copias=int(libro.copias)+1 if libro.copias is not None and int(libro.copias) > 0 else 0,
+        fk_id_departamento=libro.fk_id_departamento,
+        fk_id_genero=libro.fk_id_genero,
+        estrellas=int(libro.estrellas),
+        created_at=libro.created,
+        updated_at=None,
+    )
+    db_update_libro(libro_actualizado)
+
+    return libro_actualizado
+
+from datetime import datetime
+
+def estatus_prestamo(pk_id_copia: str) -> Prestamo: 
+    client = db_get_client()
+    
+    print(pk_id_copia)
+    # 1. Obtenemos el registro más reciente
+    record = client.collection("Prestamos").get_first_list_item(
+        f'fk_id_copia = "{pk_id_copia}"',
+        {
+            "sort": "-created_at",
+        }
+    )
+
+    print(record)
+
+    # 2. Generamos la fecha actual en formato ISO (ej. 2024-05-20T14:30:00)
+    # .isoformat() incluye la 'T' por defecto
+    fecha_hoy = datetime.now().isoformat()
+
+    # 3. Creamos el objeto con la nueva fecha de entrega
+    prestamo_actualizado = Prestamo(
+        id=record.id,
+        pk_id_prestamo=record.pk_id_prestamo,
+        fk_id_copia=record.fk_id_copia,
+        fk_id_usuario=record.fk_id_usuario,
+        fecha_prestamo=record.fecha_prestamo,
+        fecha_entrega=fecha_hoy,  # <--- Aplicada aquí
+        dias_restantes=0,
+        estatus_entrega=True
+    )
+
+    db_update_prestamo(prestamo_actualizado)
+
+    return prestamo_actualizado
+
+def db_update_prestamo(prestamo: Prestamo) -> Prestamo:
+    client = db_get_client()
+    record = client.collection("Prestamos").update(
+        prestamo.id, prestamo.model_dump(mode="json")
+    )
+
+    return Prestamo(
+        id=record.id,
+        pk_id_prestamo=record.pk_id_prestamo,
+        fk_id_copia=record.fk_id_copia,
+        fk_id_usuario=record.fk_id_usuario,
+        fecha_prestamo=record.fecha_prestamo,
+        fecha_entrega=record.fecha_entrega,
+        dias_restantes=record.dias_restantes,
+        estatus_entrega=record.estatus_entrega,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )

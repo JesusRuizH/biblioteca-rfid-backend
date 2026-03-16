@@ -4,6 +4,7 @@ from requests.models import Response
 
 from app.core.auth import db_get_client
 from app.models.db_models import CopiaLibro, Libro
+from app.pb_clients.pb_utils import restar_copia_libro, sumar_copia_libro,estatus_prestamo
 
 from app.core.config import settings
 
@@ -216,6 +217,8 @@ def db_update_stat_copia_libro_prestado(pk_id_copia: int) -> bool:
         f'pk_id_copia = "{pk_id_copia}"'
     )
 
+    restar_copia_libro(record.fk_id_libro)
+
     # Construir el formato de salida
 
     copia_libro = CopiaLibro(
@@ -242,6 +245,9 @@ def db_update_stat_copia_libro_devuelto(pk_id_copia: int) -> bool:
     record = client.collection("CopiasLibro").get_first_list_item(
         f'pk_id_copia = "{pk_id_copia}"'
     )
+    
+    sumar_copia_libro(record.fk_id_libro)
+    estatus_prestamo(record.id)
 
     # Construir el formato de salida
 
