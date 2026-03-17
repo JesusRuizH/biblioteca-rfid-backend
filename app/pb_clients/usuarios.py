@@ -245,38 +245,60 @@ def top_libros() -> List:
         top_libros_lista.append(TopLibrosAdminPanel(titulo=libro["titulo"], prestamos=libro["veces_prestado"]))
     return top_libros_lista
 
+
 def get_metrics() -> MetricasAdminPanel:
     client = db_get_client()
 
-    # get today date boundaries in ISO format with milliseconds
-    today = date.today()
-    start = datetime.combine(today, datetime.min.time()).isoformat(timespec="milliseconds") + "Z"
-    end = datetime.combine(today, datetime.max.time()).isoformat(timespec="milliseconds") + "Z"
+    ahora_local = datetime.now()
+    medianoche_hoy_local = ahora_local.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # Usuarios
-    result_clientes = client.collection("Usuarios").get_list(1, 1)
-    total_count_usuarios = result_clientes.total_items
+  
+    desfase = timedelta(hours=8)
+    
+    filtro_hoy_inicio = (medianoche_hoy_local - desfase).strftime("%Y-%m-%d %H:%M:%S")
 
-    # Prestamos (really Libros today)
-    result_prestamos = client.collection("Libros").get_list(
-        1,
-        50,
-        {"filter": f'created_at >= "{start}" && created_at <= "{end}"'}
-    )
-    total_count_prestamos = result_prestamos.total_items
+    # --- PRÉSTAMOS HOY ---
+    res_hoy = client.collection("Prestamos").get_list(1, 1, {
+        "filter": f'created_at >= "{filtro_hoy_inicio}"'
+    })
+    prestamos_hoy = res_hoy.total_items
 
-    # Libros total
-    result_libros = client.collection("Libros").get_list(1, 1)
-    total_count_libros = result_libros.total_items
+    # --- SERIE DE LA SEMANA ---
+    serie_prestamos = []
+    for i in range(6, -1, -1):
+        inicio_dia_utc = medianoche_hoy_local - timedelta(days=i) + desfase
+        fin_dia_utc = inicio_dia_utc + timedelta(days=1)
+        
+        q_start = inicio_dia_utc.strftime("%Y-%m-%d %H:%M:%S")
+        q_end = fin_dia_utc.strftime("%Y-%m-%d %H:%M:%S")
+        
+        count = client.collection("Prestamos").get_list(1, 1, {
+            "filter": f'created_at >= "{q_start}" && created_at < "{q_end}"'
+        }).total_items
+        serie_prestamos.append(count)
 
-    metrics_usuarios = MetricasValores(Total=total_count_usuarios, Delta="+12 este mes", Up=True)
-    metrics_libros = MetricasValores(Total=total_count_libros, Delta="+7 este mes", Up=True)
-    metrics_prestamos = MetricasValores(Total=total_count_prestamos, Delta="+3 este mes", Up=False)
+    # --- RESTO DE MÉTRICAS ---
+    filtro_mes = (medianoche_hoy_local - timedelta(days=30) + desfase).strftime("%Y-%m-%d %H:%M:%S")
+
+    total_usuarios = client.collection("Usuarios").get_list(1, 1).total_items
+    nuevos_usuarios = client.collection("Usuarios").get_list(1, 1, {
+        "filter": f'created_at >= "{filtro_mes}"'
+    }).total_items
+
+    total_libros = client.collection("Libros").get_list(1, 1).total_items
+    nuevos_libros = client.collection("Libros").get_list(1, 1, {
+        "filter": f'created_at >= "{filtro_mes}"'
+    }).total_items
+
+    prestamos_mes = client.collection("Prestamos").get_list(1, 1, {
+        "filter": f'created_at >= "{filtro_mes}"'
+    }).total_items
 
     return MetricasAdminPanel(
-        Usuarios=metrics_usuarios,
-        Libros=metrics_libros,
-        PrestamosHoy=metrics_prestamos,
+        Usuarios=MetricasValores(Total=total_usuarios, Delta=f"+{nuevos_usuarios} este mes", Up=nuevos_usuarios > 0),
+        Libros=MetricasValores(Total=total_libros, Delta=f"+{nuevos_libros} este mes", Up=nuevos_libros > 0),
+        PrestamosHoy=MetricasValores(Total=prestamos_hoy, Delta=f"{prestamos_mes} en 30d", Up=prestamos_hoy > 0),
+        SeriePrestamos=serie_prestamos
     )
 
 def get_prestamos_ultimos_siete_dias() -> Dict:
