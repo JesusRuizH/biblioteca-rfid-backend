@@ -151,7 +151,7 @@ def update_libro_puntuacion(idlibro, promedio):
         descripcion= libro.descripcion,
         fecha_publicacion=libro.fecha_publicacion,
         ruta_img=None,
-        copias=int(libro.copias)-1 if libro.copias is not None else 0,
+        copias=libro.copias,
         fk_id_departamento=libro.fk_id_departamento,
         fk_id_genero=libro.fk_id_genero,
         estrellas=promedio,

@@ -27,6 +27,7 @@ def db_get_last_id_usuario() -> int:
     return last_usuario.items[0].pk_id_usuario
 
 def db_create_usuario(usuario: Usuario) -> Usuario:
+    print(usuario)
     client = db_get_client()
     last_usuario = db_get_last_id_usuario()
 
@@ -96,6 +97,7 @@ def db_get_users_paginados(limit: int, offset: int, q = None) -> Dict:
                 pk_id_usuario=r.pk_id_usuario,
                 nombre_usuario=r.nombre_usuario,
                 email=r.email,
+                fecha_nacimiento= r.fecha_nacimiento,
                 verified=r.verified,
                 fk_id_tipo_usuario=r.fk_id_tipo_usuario,
                 created_at=r.created_at,
@@ -130,6 +132,9 @@ def db_auth_usuario(email: str, password: str) -> Usuario:
     client = PocketBase(f'{settings.POCKETBASE_URL}')
     auth_data = client.collection("Usuarios").auth_with_password(email.lower(), password)
     record = auth_data.record
+    if record.verified is False: 
+        return {"error": "Tu cuenta está desactivada."}
+
     id_tipo_usuario = str(record.fk_id_tipo_usuario)
     rol = ""
     tipo_usuario = client.collection("TipoUsuario").get_one(id_tipo_usuario)

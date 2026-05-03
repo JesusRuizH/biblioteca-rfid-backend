@@ -69,7 +69,7 @@ def db_get_top_libros(top: int) -> List:
             break
     return top_libros
 
-def restar_copia_libro(fk_id_libro: str) -> Libro: 
+def actualizar_copias_libros(fk_id_libro: str) -> Libro: 
     client = db_get_client()
     libro = client.collection('Libros').get_one(fk_id_libro)
 
@@ -81,7 +81,7 @@ def restar_copia_libro(fk_id_libro: str) -> Libro:
         descripcion= libro.descripcion,
         fecha_publicacion=libro.fecha_publicacion,
         ruta_img=None,
-        copias=int(libro.copias)-1 if libro.copias is not None and int(libro.copias) > 0 else 0,
+        copias=db_get_count_copias_libros(fk_id_libro),
         fk_id_departamento=libro.fk_id_departamento,
         fk_id_genero=libro.fk_id_genero,
         estrellas=int(libro.estrellas),
@@ -94,7 +94,7 @@ def restar_copia_libro(fk_id_libro: str) -> Libro:
 
     return libro_actualizado
 
-def sumar_copia_libro(fk_id_libro: str) -> Libro: 
+def actualizar_copias_libros(fk_id_libro: str) -> Libro: 
     client = db_get_client()
     libro = client.collection('Libros').get_one(fk_id_libro)
 
@@ -106,7 +106,7 @@ def sumar_copia_libro(fk_id_libro: str) -> Libro:
         descripcion= libro.descripcion,
         fecha_publicacion=libro.fecha_publicacion,
         ruta_img=None,
-        copias=int(libro.copias)+1 if libro.copias is not None and int(libro.copias) > 0 else 0,
+        copias=db_get_count_copias_libros(fk_id_libro),
         fk_id_departamento=libro.fk_id_departamento,
         fk_id_genero=libro.fk_id_genero,
         estrellas=int(libro.estrellas),
@@ -171,3 +171,24 @@ def db_update_prestamo(prestamo: Prestamo) -> Prestamo:
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
+
+def db_get_count_copias_libros(fk_id_libro) -> int:
+    client = db_get_client()
+    if not client:
+        return 0
+
+    try:
+        # We request only 1 item per page (the minimum) 
+        # because we only care about the 'total_items' property.
+        result = client.collection("CopiasLibro").get_list(
+            page=1,
+            per_page=1,
+            query_params={
+                "filter": f'fk_id_libro="{fk_id_libro}" && disponibilidad=True'
+            }
+        )
+        #print(result.total_items)
+        return result.total_items
+    except Exception as e:
+        print(f"Error al contar copias: {e}")
+        return 0

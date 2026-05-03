@@ -4,7 +4,7 @@ from requests.models import Response
 
 from app.core.auth import db_get_client
 from app.models.db_models import CopiaLibro, Libro
-from app.pb_clients.pb_utils import restar_copia_libro, sumar_copia_libro,estatus_prestamo
+from app.pb_clients.pb_utils import actualizar_copias_libros ,estatus_prestamo, db_get_count_copias_libros
 
 from app.core.config import settings
 
@@ -52,7 +52,7 @@ def db_create_copia_libro(copia_libro: CopiaLibro) -> CopiaLibro:
         descripcion= libro.descripcion,
         fecha_publicacion=libro.fecha_publicacion,
         ruta_img=None,
-        copias=int(libro.copias)+1 if libro.copias is not None else 0,
+        copias=db_get_count_copias_libros(libro.id),
         fk_id_departamento=libro.fk_id_departamento,
         fk_id_genero=libro.fk_id_genero,
         estrellas=int(libro.estrellas),
@@ -217,7 +217,7 @@ def db_update_stat_copia_libro_prestado(pk_id_copia: int) -> bool:
         f'pk_id_copia = "{pk_id_copia}"'
     )
 
-    restar_copia_libro(record.fk_id_libro)
+    actualizar_copias_libros(record.fk_id_libro)
 
     # Construir el formato de salida
 
@@ -246,7 +246,6 @@ def db_update_stat_copia_libro_devuelto(pk_id_copia: int) -> bool:
         f'pk_id_copia = "{pk_id_copia}"'
     )
     
-    sumar_copia_libro(record.fk_id_libro)
     estatus_prestamo(record.id)
 
     # Construir el formato de salida
@@ -274,6 +273,9 @@ def db_update_copia_libro(copia_libro: CopiaLibro) -> CopiaLibro:
     updated = client.collection("CopiasLibro").update(
         copia_libro.id, copia_libro.model_dump(mode="json")
     )
+
+    actualizar_copias_libros(updated.fk_id_libro)
+    
     return CopiaLibro(
         id=updated.id,
         pk_id_copia=updated.pk_id_copia,
@@ -297,27 +299,12 @@ def db_delete_copia_libro(pk_id_copia: int) -> Response:
         query_params={"filter": f'fk_id_copia="{copia.id}"'}
     )
 
-    libro = client.collection('Libros').get_one(copia.fk_id_libro)
-
-    libro_actualizado = Libro(
-        id=libro.id,
-        pk_id_libro=libro.pk_id_libro,
-        titulo=libro.titulo,
-        autor=libro.autor,
-        descripcion= libro.descripcion,
-        fecha_publicacion=libro.fecha_publicacion,
-        ruta_img=None,
-        copias=int(libro.copias)-1 if libro.copias is not None and int(libro.copias) >= 0 else 0,
-        fk_id_departamento=libro.fk_id_departamento,
-        fk_id_genero=libro.fk_id_genero,
-        estrellas=int(libro.estrellas),
-        created_at=libro.created,
-        updated_at=None,
-    )
-
-    db_update_libro(libro_actualizado)
-
     for prestamo in prestamos:
         client.collection("Prestamos").delete(prestamo.id)
 
-    return client.collection("CopiasLibro").delete(copia.id)
+    status = client.collection("CopiasLibro").delete(copia.id)
+
+    actualizar_copias_libros(copia.fk_id_libro)
+
+    return status
+
