@@ -397,6 +397,99 @@ def db_get_historial_paginado(offset: int, limit: int) -> Tuple[List[Dict], int]
     # Retornamos los datos procesados y el total de registros (totalItems)
     return mis_prestamos, response.total_items
 
+
+def db_get_historial_por_fechas(start_date: str, end_date: str) -> Tuple[List[Dict], int]:
+    """
+    Retorna el historial de préstamos filtrado por un rango de fechas.
+    start_date y end_date deben venir en formato "YYYY-MM-DD HH:MM:SS" o "YYYY-MM-DD".
+    """
+    client = db_get_client()
+    
+    # Construcción del filtro de fecha
+    # Usamos created_at o fecha_prestamo según sea tu campo de control
+    date_filter = f'created_at >= "{start_date}" && created_at <= "{end_date}"'
+
+    try:
+        # Al filtrar por fechas específicas, usualmente queremos la lista completa 
+        # del periodo en lugar de una página fija.
+        response_items = client.collection("Prestamos").get_full_list(
+            query_params={
+                "expand": "fk_id_copia.fk_id_libro.fk_id_genero, fk_id_usuario",
+                "filter": date_filter,
+                "sort": "-created_at"
+            }
+        )
+    except Exception as e:
+        print(f"Error al obtener historial por fechas: {e}")
+        return [], 0
+
+    mis_prestamos = []
+    
+    for prestamo in response_items:
+        # Valores por defecto
+        titulo_libro = "Desconocido"
+        autor = "Desconocido"
+        nombre_usuario = "Desconocido"
+        correo_usuario = "Desconocido"
+        id_usuario = "Desconocido"
+        genero_lista = []
+        
+        # Navegación segura por los niveles de expand
+        expand_p = getattr(prestamo, "expand", {})
+        copia = expand_p.get("fk_id_copia")
+        usuario = expand_p.get("fk_id_usuario")
+        
+        # Datos del Usuario
+        if usuario:
+            nombre_usuario = getattr(usuario, "nombre_usuario", "Desconocido")
+            correo_usuario = getattr(usuario, "email", "Desconocido")
+            id_usuario = getattr(usuario, "pk_id_usuario", "N/A")
+
+        # Datos del Libro y Copia
+        isbn_val = "N/A"
+        rfid_val = "N/A"
+        
+        if copia:
+            isbn_val = getattr(copia, "isbn", "N/A")
+            rfid_val = getattr(copia, "rfid_tag", "N/A")
+            
+            expand_c = getattr(copia, "expand", {})
+            libro = expand_c.get("fk_id_libro")
+            
+            if libro:
+                titulo_libro = getattr(libro, "titulo", "Sin título")
+                autor = getattr(libro, "autor", "Anónimo")
+                
+                expand_l = getattr(libro, "expand", {})
+                generos = expand_l.get("fk_id_genero")
+                
+                if generos:
+                    # Normalización de géneros (soporta objeto único o lista)
+                    if isinstance(generos, list):
+                        genero_lista = [getattr(g, "genero", "") for g in generos]
+                    else:
+                        genero_lista = [getattr(generos, "genero", "")]
+
+        # Construcción del objeto final
+        mis_prestamos.append({
+            "usuario": nombre_usuario,
+            "email": correo_usuario,
+            "id_usuario": id_usuario,
+            "pk_id_prestamo": prestamo.id,
+            "titulo": titulo_libro,
+            "autor": autor,
+            "genero": genero_lista,
+            "fecha_prestamo": getattr(prestamo, "fecha_prestamo", ""),
+            "fecha_entrega": getattr(prestamo, "fecha_entrega", ""),
+            "estatus_entrega": getattr(prestamo, "estatus_entrega", False),
+            "isbn": isbn_val,
+            "rfid_tag": rfid_val,
+            "creado": getattr(prestamo, "created", "") # Útil para auditoría
+        })
+    
+    return mis_prestamos, len(mis_prestamos)
+
+
 def db_get_historial_prestamos_admin(cantidad: int) -> List:
     client = db_get_client()
     prestamos = client.collection("Prestamos").get_list(

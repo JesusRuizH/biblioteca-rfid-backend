@@ -134,48 +134,60 @@ def db_get_all_copies() -> List:
     return copias_list
 
 def db_get_copias_paginadas(limit, offset, q=None) -> Dict:
+    # 1. Cálculo de página (PocketBase usa base 1)
     page = (offset // limit) + 1
 
-    base_url = f"{settings.POCKETBASE_URL_IMAGENES}" #"http://localhost:8090"
-    collection_id = "pbc_2270877598"
+    base_url = f"{settings.POCKETBASE_URL_IMAGENES}"
+    collection_id_libros = "pbc_2270877598" # ID de la colección 'Libros'
     client = db_get_client()
 
     query_params = {
         "expand": "fk_id_libro"
     }
 
+    # 2. Corregir el filtro para usar campos expandidos
     if q:
         q = q.strip()
-        query_params["filter"] = f'rfid_tag ~ "{q}" || isbn ~ "{q}"'
+        # IMPORTANTE: Usamos fk_id_libro.campo para buscar en la relación
+        query_params["filter"] = f'fk_id_libro.titulo ~ "{q}" || fk_id_libro.autor ~ "{q}"'
 
-    record = client.collection("CopiasLibro").get_list(
-        page=page,
-        per_page=limit,
-        query_params=query_params
-    )
+    try:
+        record = client.collection("CopiasLibro").get_list(
+            page=page,
+            per_page=limit,
+            query_params=query_params
+        )
+    except Exception as e:
+        print(f"Error en PocketBase: {e}")
+        return {"items": [], "total": 0}
 
     copias_list = []
 
     for r in record.items:
-        libro = r.expand.get("fk_id_libro") if r.expand else None
-
+        # Extraer el objeto expandido de forma segura
+        libro_data = r.expand.get("fk_id_libro") if r.expand else None
+        
+        # El objeto expandido en el SDK de Python suele ser un objeto Record o un Dict
+        # Si es un objeto Record, accedemos con .campo, si es dict con .get()
+        # Asumiendo que el SDK devuelve objetos Record en el expand:
+        
         copias_list.append(
             {
                 "id": r.id,
-                "pk_id_copia": r.pk_id_copia,
+                "pk_id_copia": getattr(r, "pk_id_copia", None),
                 "libro": {
-                    "autor": libro.autor if libro else None,
-                    "titulo": libro.titulo if libro else None,
+                    "autor": getattr(libro_data, "autor", None) if libro_data else "Desconocido",
+                    "titulo": getattr(libro_data, "titulo", None) if libro_data else "Sin título",
                     "ruta_img": (
-                        f"{base_url}/api/files/{collection_id}/{libro.id}/{libro.ruta_img}"
-                        if libro and libro.ruta_img
+                        f"{base_url}/api/files/{collection_id_libros}/{libro_data.id}/{libro_data.ruta_img}"
+                        if libro_data and getattr(libro_data, "ruta_img", None)
                         else None
                     )
                 },
                 "fk_id_libro": r.fk_id_libro,
-                "isbn": r.isbn,
-                "rfid_tag": r.rfid_tag,
-                "disponibilidad": r.disponibilidad,
+                "isbn": getattr(r, "isbn", None),
+                "rfid_tag": getattr(r, "rfid_tag", None),
+                "disponibilidad": getattr(r, "disponibilidad", False),
             }
         )
 
@@ -183,7 +195,6 @@ def db_get_copias_paginadas(limit, offset, q=None) -> Dict:
         "items": copias_list,
         "total": record.total_items
     }
-
 
 def db_get_copia_libro_rfid(rfid: str) -> Dict:
     client = db_get_client()

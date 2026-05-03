@@ -22,7 +22,8 @@ from app.pb_clients.prestamos import (
     get_libros_cache,
     db_get_mis_recomendaciones,
     db_get_historial_paginado,
-    db_get_generos_leidos_usuario
+    db_get_generos_leidos_usuario,
+    db_get_historial_por_fechas
 )
 from app.models.db_models import Prestamo
 
@@ -47,6 +48,20 @@ def get_list_libros(
     """
     try:
         return db_get_historial_paginado(offset, limit)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/get_historial_fechas/", response_model=[], summary="Get historial páginado")   
+@router.get("/get_historial_fechas", response_model=[], summary="Get historial páginado")
+def get_list_libros(
+    start_date: str,
+    end_date: str,
+):
+    """
+    Obtenemos los usuarios por páginación
+    """
+    try:
+        return db_get_historial_por_fechas(start_date, end_date)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
