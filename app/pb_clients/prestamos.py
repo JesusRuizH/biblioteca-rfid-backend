@@ -2,6 +2,8 @@ from collections import Counter
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+from zoneinfo import ZoneInfo
+
 from requests.models import Response
 
 from app.interfaces.ml import get_ml_recomendaciones
@@ -651,24 +653,55 @@ def db_get_generos_leidos_usuario(fk_id_usuario: str) -> List:
 
 
 
-def db_get_prestamos_por_mes(pk_id_usuario: str) -> Dict:
+def db_get_prestamos_por_mes(pk_id_usuario: str) -> List[Dict]:
     client = db_get_client()
+    
+    # 1. Fetch loans for the user (Adjust pagination if they can have more than 20 loans total)
     prestamos = client.collection("Prestamos").get_list(
         1,
-        20,
+        200,  # Increased to capture a better monthly overview
         {
             "filter": f'fk_id_usuario = "{pk_id_usuario}"'
         }
     )
-    months = [datetime.fromisoformat(r.created_at.replace("Z", "+00:00")).strftime("%B") for r in  prestamos.items]
+    
+    # Timezone setups
+    utc_tz = ZoneInfo("UTC")
+    mx_tz = ZoneInfo("America/Mexico_City")
+    
+    # Spanish month mapping helper
+    meses_es = {
+        1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 
+        5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto", 
+        9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+    }
+    
+    months = []
+    for r in prestamos.items:
+        # 2. Parse the database string as a UTC-aware datetime
+        # (Handles "Z" replacement safely)
+        dt_str = r.created_at.replace("Z", "+00:00")
+        dt_utc = datetime.fromisoformat(dt_str).replace(tzinfo=utc_tz)
+        
+        # 3. Convert to Mexico City time before checking the month!
+        dt_local = dt_utc.astimezone(mx_tz)
+        
+        # Get the localized month name
+        nombre_mes = meses_es[dt_local.month]
+        months.append(nombre_mes)
+        
+    # 4. Count frequencies
     conteo_por_mes = Counter(months)
+    
+    # 5. Build the list (Fixed: initialized OUTSIDE the loop)
     conteos_mensuales = []
     for month, count in conteo_por_mes.items():
-        print(month, count)
-        conteos_mensuales = []
-        obj_cont_mensual = { "mes": month, "prestamos": count }
-        conteos_mensuales.append(obj_cont_mensual)
-
+        print(f"{month}: {count}")
+        conteos_mensuales.append({
+            "mes": month, 
+            "prestamos": count
+        })
+        
     return conteos_mensuales
 
 def db_get_prestamos_por_mes_admin() -> List:
