@@ -197,6 +197,8 @@ def db_get_copias_paginadas(limit, offset, q=None) -> Dict:
     }
 
 def db_get_copia_libro_rfid(rfid: str) -> Dict:
+    base_url = f"{settings.POCKETBASE_URL_IMAGENES}"
+    collection_id_libros = "pbc_2270877598"
     client = db_get_client()
 
     # Buscar la copia del libro por el RFID
@@ -214,8 +216,16 @@ def db_get_copia_libro_rfid(rfid: str) -> Dict:
             "disponibilidad": record.disponibilidad,
             "rfid_tag": record.rfid_tag,
             "titulo": libro.titulo,
+            "descripcion": libro.descripcion,
+            "fecha_publicacion": libro.fecha_publicacion,
+            "estrellas": libro.estrellas,
             "autor": libro.autor,
             "isbn": record.isbn,
+            "ruta_img": (
+                        f"{base_url}/api/files/{collection_id_libros}/{libro.id}/{libro.ruta_img}"
+                        if libro and getattr(libro, "ruta_img", None)
+                        else None
+                    )
         }
 
     return response

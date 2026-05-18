@@ -1,7 +1,8 @@
-from datetime import date, datetime
 from typing import List, Dict
 from pocketbase import PocketBase
 from app.core.config import settings
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from requests.models import Response
 from app.core.auth import db_get_client
@@ -9,7 +10,6 @@ from app.models.db_models import Usuario
 from app.models.queries_models import EstadisticasAdminPanelA, MetricasValores, TopLibrosAdminPanel, MetricasAdminPanel
 from app.pb_clients.pb_utils import db_get_top_libros
 
-from datetime import datetime, timedelta
 from collections import Counter
 
 
@@ -230,14 +230,13 @@ def db_get_estadisticas_admin_panel_a() -> EstadisticasAdminPanelA:
     metricas = get_metrics()
     top = top_libros()
     ultimos_siete_dias = get_prestamos_ultimos_siete_dias()
-    conteo_ultimos_siete_dias = []
-    for dia, prestamos in ultimos_siete_dias.items():
-        conteo_ultimos_siete_dias.append(prestamos)
+
+    print(metricas)
 
     estadisticas_admin_panel = EstadisticasAdminPanelA(
         Metricas=metricas,
         TopLibros=top,
-        SeriePrestamos=conteo_ultimos_siete_dias
+        SeriePrestamos=ultimos_siete_dias
     )
 
     return estadisticas_admin_panel
@@ -254,15 +253,22 @@ def top_libros() -> List:
 def get_metrics() -> MetricasAdminPanel:
     client = db_get_client()
 
-    ahora_local = datetime.now()
+    # 1. Define Mexico City and UTC timezones
+    mx_tz = ZoneInfo("America/Mexico_City")
+    utc_tz = ZoneInfo("UTC")
+
+    # 2. Get the current time explicitly in Mexico City timezone
+    ahora_local = datetime.now(mx_tz)
+
+    # 3. Get local midnight (still attached to Mexico City timezone)
     medianoche_hoy_local = ahora_local.replace(hour=0, minute=0, second=0, microsecond=0)
 
-  
-    desfase = timedelta(hours=8)
-    
-    filtro_hoy_inicio = (medianoche_hoy_local - desfase).strftime("%Y-%m-%d %H:%M:%S")
+    #print(f'Hora hoy MX: {ahora_local}, media noche hoy MX: {medianoche_hoy_local}')
 
     # --- PRÉSTAMOS HOY ---
+    medianoche_hoy_utc = medianoche_hoy_local.astimezone(utc_tz)
+    filtro_hoy_inicio = medianoche_hoy_utc.strftime("%Y-%m-%d %H:%M:%S")
+
     res_hoy = client.collection("Prestamos").get_list(1, 1, {
         "filter": f'created_at >= "{filtro_hoy_inicio}"'
     })
@@ -271,19 +277,32 @@ def get_metrics() -> MetricasAdminPanel:
     # --- SERIE DE LA SEMANA ---
     serie_prestamos = []
     for i in range(6, -1, -1):
-        inicio_dia_utc = medianoche_hoy_local - timedelta(days=i) + desfase
-        fin_dia_utc = inicio_dia_utc + timedelta(days=1)
+        # Calculate the exact start of the target day (00:00:00)
+        dia_local_inicio = medianoche_hoy_local - timedelta(days=i)
         
-        q_start = inicio_dia_utc.strftime("%Y-%m-%d %H:%M:%S")
-        q_end = fin_dia_utc.strftime("%Y-%m-%d %H:%M:%S")
+        # Calculate the exact end of that SAME target day (23:59:59)
+        dia_local_fin = dia_local_inicio.replace(hour=23, minute=59, second=59, microsecond=0)
+        #print(f'dia_local_inicio: {dia_local_inicio}, dia_local_fin:{dia_local_fin}')
+
+        # Convert both to UTC for the database query
+        inicio_dia_utc = dia_local_inicio.astimezone(utc_tz)
+        fin_dia_utc = dia_local_fin.astimezone(utc_tz)
         
+        q_start = dia_local_inicio.strftime("%Y-%m-%d %H:%M:%S")
+        q_end = dia_local_fin.strftime("%Y-%m-%d %H:%M:%S")
+
+        
+        # Change operator to <= since q_end is now inside the actual day boundary
         count = client.collection("Prestamos").get_list(1, 1, {
-            "filter": f'created_at >= "{q_start}" && created_at < "{q_end}"'
+            "filter": f'created_at >= "{q_start}" && created_at <= "{q_end}"'
         }).total_items
         serie_prestamos.append(count)
+        #print(f'q start: {q_start}, q end:{q_end}, count: {count}, list: {serie_prestamos}')
 
-    # --- RESTO DE MÉTRICAS ---
-    filtro_mes = (medianoche_hoy_local - timedelta(days=30) + desfase).strftime("%Y-%m-%d %H:%M:%S")
+    # --- RESTO DE MÉTRICAS (30 DÍAS) ---
+    inicio_mes_local = medianoche_hoy_local - timedelta(days=30)
+    inicio_mes_utc = inicio_mes_local.astimezone(utc_tz)
+    filtro_mes = inicio_mes_utc.strftime("%Y-%m-%d %H:%M:%S")
 
     total_usuarios = client.collection("Usuarios").get_list(1, 1).total_items
     nuevos_usuarios = client.collection("Usuarios").get_list(1, 1, {
@@ -306,27 +325,33 @@ def get_metrics() -> MetricasAdminPanel:
         SeriePrestamos=serie_prestamos
     )
 
-def get_prestamos_ultimos_siete_dias() -> Dict:
+def get_prestamos_ultimos_siete_dias() -> List:
     client = db_get_client()
-    # Obtener la fecha de hace 7 días
-    hoy = datetime.utcnow().date()
-    hace_7 = hoy - timedelta(days=6)
 
-    # El filtro correcto para PocketBase:
-    filter_query = f'created_at >= "{hace_7.isoformat()}T00:00:00Z"'
+    # 1. Define Mexico City and UTC timezones
+    mx_tz = ZoneInfo("America/Mexico_City")
+    utc_tz = ZoneInfo("UTC")
 
-    registros = client.collection("Prestamos").get_full_list(
-        query_params={"filter": filter_query}
-    )
+    # 2. Get the current time explicitly in Mexico City timezone
+    ahora_local = datetime.now(mx_tz)
 
-    conteo_por_dia = Counter()
-    for r in registros:
-        fecha = datetime.fromisoformat(r.created_at).date()
-        conteo_por_dia[str(fecha)] += 1
+    # 3. Get local midnight (still attached to Mexico City timezone)
+    medianoche_hoy_local = ahora_local.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    resultado = {}
-    for i in range(7):
-        dia = hace_7 + timedelta(days=i)
-        resultado[str(dia)] = conteo_por_dia.get(str(dia), 0)
+    # --- SERIE DE LA SEMANA ---
+    serie_prestamos = []
+    for i in range(6, -1, -1):
+        dia_local_inicio = medianoche_hoy_local - timedelta(days=i)
+        
+        dia_local_fin = dia_local_inicio.replace(hour=23, minute=59, second=59, microsecond=0)
+        
+        q_start = dia_local_inicio.strftime("%Y-%m-%d %H:%M:%S")
+        q_end = dia_local_fin.strftime("%Y-%m-%d %H:%M:%S")
 
-    return resultado
+        count = client.collection("Prestamos").get_list(1, 1, {
+            "filter": f'created_at >= "{q_start}" && created_at <= "{q_end}"'
+        }).total_items
+        serie_prestamos.append(count)
+
+
+    return serie_prestamos
