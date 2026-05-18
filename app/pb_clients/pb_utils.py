@@ -117,6 +117,13 @@ def actualizar_copias_libros(fk_id_libro: str) -> Libro:
 
     return libro_actualizado
 
+def actualizar_copias_libros_prestamos(pk_copia_libro: str) -> Libro: 
+    client = db_get_client()
+
+    copia_libro = client.collection('CopiasLibro').get_one(pk_copia_libro)
+
+    return actualizar_copias_libros(copia_libro.fk_id_libro)
+
 from datetime import datetime
 
 def estatus_prestamo(pk_id_copia: str) -> Prestamo: 

@@ -1,6 +1,7 @@
-from typing import Dict
+from typing import Dict, List
 from app.core.auth import db_get_client
 from app.pb_clients.prestamos import get_libros_cache
+from zoneinfo import ZoneInfo
 from collections import Counter
 from datetime import datetime, timedelta
 from datetime import datetime, timedelta, timezone
@@ -55,11 +56,18 @@ def db_get_statistics() -> Dict:
         "usuariosActivos": usuariosActivos
     }
 
-def get_last_14_days_statistics(client):
-    today = datetime.now(timezone.utc)
-    start_date = (today - timedelta(days=13)).replace(hour=0, minute=0, second=0, microsecond=0)
-    # PocketBase acepta 'YYYY-MM-DD HH:MM:SS' directamente en el filtro
-    start_str = start_date.strftime("%Y-%m-%d %H:%M:%S")
+def get_last_14_days_statistics(client) -> List[Dict]:
+    # 1. Define Mexico City and UTC timezones
+    mx_tz = ZoneInfo("America/Mexico_City")
+    utc_tz = ZoneInfo("UTC")
+
+    # 2. Get current time in Mexico City and calculate local start date (13 days ago + today = 14 days)
+    ahora_local = datetime.now(mx_tz)
+    start_date_local = (ahora_local - timedelta(days=13)).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 3. Convert local start date to UTC for the PocketBase filter boundary
+    start_date_utc = start_date_local.astimezone(utc_tz)
+    start_str = start_date_utc.strftime("%Y-%m-%d %H:%M:%S")
 
     records = client.collection("Prestamos").get_full_list(
         query_params={
@@ -68,13 +76,29 @@ def get_last_14_days_statistics(client):
         }
     )
 
-    # Extraer fechas y contar
-    counts = Counter(r.fecha_prestamo[:10] for r in records if r.fecha_prestamo)
+    # 4. Extract dates localized to Mexico City before counting
+    fechas_locales = []
+    for r in records:
+        if r.fecha_prestamo:
+            # Standardize string Z to +00:00 and parse to aware UTC
+            dt_str = r.fecha_prestamo.replace("Z", "+00:00")
+            dt_utc = datetime.fromisoformat(dt_str)
+            
+            # Convert to Mexico City time to extract the true local calendar day
+            dt_local = dt_utc.astimezone(mx_tz)
+            fechas_locales.append(dt_local.strftime("%Y-%m-%d"))
 
+    counts = Counter(fechas_locales)
+
+    # 5. Build the 14-day sequence using Mexico City dates
     results = []
     for i in range(14):
-        date_str = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-        results.append({"d": date_str, "n": counts.get(date_str, 0)})
+        date_str = (start_date_local + timedelta(days=i)).strftime("%Y-%m-%d")
+        results.append({
+            "d": date_str, 
+            "n": counts.get(date_str, 0)
+        })
+        
     return results
 
 

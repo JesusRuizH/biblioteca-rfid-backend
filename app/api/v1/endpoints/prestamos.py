@@ -203,26 +203,23 @@ def api_db_get_prestamos_por_mes(fk_id_usuario: str):
         raise HTTPException(status_code=404, detail=str(e))
     
 
-@router.get("/historial_prestamos/{fk_id_usuario}", summary="Obtener historial de préstamos por ID de usuario")
+@router.get("/historial_prestamos/{fk_id_usuario}", summary="Obtener historial de préstamos paginado")
 def api_db_get_historial_prestamos(
     fk_id_usuario: str, 
-    limit: int = Query(10, gt=0, le=100) # Valor por defecto 10, mínimo 1, máximo 100
+    page: int = Query(1, ge=1),                  # Default page 1, minimum 1
+    limit: int = Query(10, gt=0, le=100)         # Default 10, min 1, max 100
 ):
     """
-    Recupera los préstamos de un usuario.
+    Recupera los préstamos de un usuario de forma paginada.
     
     - **fk_id_usuario**: ID único del usuario en PocketBase.
-    - **limit**: Cantidad de registros a recuperar (parámetro de consulta).
+    - **page**: El número de página actual.
+    - **limit**: Cantidad de registros por página.
     """
     try:
-        # Validamos que el límite no llegue en 0 a la función de base de datos
-        res = db_get_historial_prestamos(fk_id_usuario, limit)
-        if not res:
-            # Si no hay préstamos, devolvemos lista vacía (esto no es un error 404)
-            return []
+        res = db_get_historial_prestamos(fk_id_usuario, page, limit)
         return res
     except Exception as e:
-        # Si algo falla en la conexión o lógica
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     
 @router.get("/mis_recomendaciones/{pk_id_usuario}", response_model=[], summary="get loans based on pk_id_usuario ")

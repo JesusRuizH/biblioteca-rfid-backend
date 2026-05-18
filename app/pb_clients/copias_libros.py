@@ -4,7 +4,7 @@ from requests.models import Response
 
 from app.core.auth import db_get_client
 from app.models.db_models import CopiaLibro, Libro
-from app.pb_clients.pb_utils import actualizar_copias_libros ,estatus_prestamo, db_get_count_copias_libros
+from app.pb_clients.pb_utils import actualizar_copias_libros ,estatus_prestamo, db_get_count_copias_libros, actualizar_copias_libros_prestamos
 
 from app.core.config import settings
 
@@ -256,6 +256,9 @@ def db_update_stat_copia_libro_prestado(pk_id_copia: int) -> bool:
     updated = client.collection("CopiasLibro").update(
         copia_libro.id, copia_libro.model_dump(mode="json")
     )
+    # AQUI
+        
+    actualizar_copias_libros(record.fk_id_libro)
 
     return updated
 
@@ -285,6 +288,7 @@ def db_update_stat_copia_libro_devuelto(pk_id_copia: int) -> bool:
     updated = client.collection("CopiasLibro").update(
         copia_libro.id, copia_libro.model_dump(mode="json")
     )
+    actualizar_copias_libros(record.fk_id_libro)
 
     return updated
 

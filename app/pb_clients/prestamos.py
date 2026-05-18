@@ -190,20 +190,22 @@ def db_get_mis_prestamos_pendientes(pk_id_usuario: int) -> List:
         mis_prestamos.append(libro_top)
     return mis_prestamos
 
-def db_get_historial_prestamos(fk_id_usuario: str, limit: int) -> List:
+def db_get_historial_prestamos(fk_id_usuario: str, page: int, limit: int) -> Dict:
     client = db_get_client()
     
-    # En get_list(page, per_page, options):
-    # Usamos page=1 y per_page=limit para obtener exactamente la cantidad deseada.
+    # Send both dynamic page and limit variables directly to PocketBase
     prestamos = client.collection("Prestamos").get_list(
-        1,
+        page,
         limit,
         {
             "filter": f'fk_id_usuario = "{fk_id_usuario}"',
             "expand": "fk_id_copia.fk_id_libro.fk_id_genero",
-            "sort": "-created_at"  # Trae los más nuevos primero
+            "sort": "-created_at"  # Newest items first
         }
     )
+    
+    # Get current time in UTC right now to compare with database timestamps safely
+    ahora_utc = datetime.now(ZoneInfo("UTC"))
     
     mis_prestamos = []
 
@@ -212,7 +214,7 @@ def db_get_historial_prestamos(fk_id_usuario: str, limit: int) -> List:
         autor = "Desconocido"
         genero_lista = []
         
-        # Acceso seguro a los niveles de expansión
+        # Safe access to expansion layers
         expand_prestamo = getattr(prestamo, "expand", {})
         copia = expand_prestamo.get("fk_id_copia")
         
@@ -228,11 +230,33 @@ def db_get_historial_prestamos(fk_id_usuario: str, limit: int) -> List:
                 generos = expand_libro.get("fk_id_genero")
                 
                 if generos:
-                    # Manejo si generos es una lista (relación múltiple)
                     if isinstance(generos, list):
                         genero_lista = [getattr(g, "genero", "") for g in generos]
                     else:
                         genero_lista = [getattr(generos, "genero", "")]
+        
+        # --- RESOLVE STATE LOGIC ---
+        fecha_dev_str = getattr(prestamo, "fecha_entrega", "")
+        esta_devuelto = getattr(prestamo, "estatus_entrega", False)
+        
+        if esta_devuelto:
+            estado = "devuelto"
+        elif fecha_dev_str:
+            try:
+                # Standardize 'Z' to '+00:00' to cleanly parse into an aware datetime
+                dt_str = fecha_dev_str.replace("Z", "+00:00")
+                fecha_dev_utc = datetime.fromisoformat(dt_str)
+                
+                # If current time has passed the return date, it's overdue
+                if ahora_utc >= fecha_dev_utc:
+                    estado = "no_devuelto"
+                else:
+                    estado = "en_prestamo"
+            except ValueError:
+                # Fallback safeguard if string format is corrupt
+                estado = "en_prestamo"
+        else:
+            estado = "en_prestamo"
 
         libros_prestados = {
             "id": getattr(prestamo, "pk_id_prestamo", prestamo.id),
@@ -240,12 +264,19 @@ def db_get_historial_prestamos(fk_id_usuario: str, limit: int) -> List:
             "autor": autor,
             "genero": genero_lista,
             "fecha_prestamo": getattr(prestamo, "fecha_prestamo", ""),
-            "fecha_devolucion": getattr(prestamo, "fecha_entrega", ""),
-            "estado": "En préstamo" if not getattr(prestamo, "estatus_entrega", False) else "Devuelto",
+            "fecha_devolucion": fecha_dev_str,
+            "estado": estado,
         }
         mis_prestamos.append(libros_prestados)
         
-    return mis_prestamos
+    # Return structured metadata along with the records list
+    return {
+        "items": mis_prestamos,
+        "page": prestamos.page,
+        "per_page": prestamos.per_page,
+        "total_items": prestamos.total_items,
+        "total_pages": prestamos.total_pages
+    }
 
 def db_get_mis_recomendaciones(pk_id_usuario: int) -> List: 
     # Basado en el id del usuario retornaremos un conjunto de recomendaciones basadas en Basic ML y arboles de decisión
@@ -302,7 +333,7 @@ def db_get_total_prestamos() -> int:
     client = db_get_client()
     result = client.collection("Prestamos").get_list(1, 1)
     total_count = result.total_items
-    print("Total Prestamos:", total_count)
+    #print("Total Prestamos:", total_count)
 
     return total_count
 
@@ -316,7 +347,7 @@ def db_get_total_mis_prestamos(fk_id_usuario: str) -> Dict:
     })
     
     total_count = result.total_items
-    print(f"Total Prestamos para el usuario {fk_id_usuario}: {total_count}")
+    #print(f"Total Prestamos para el usuario {fk_id_usuario}: {total_count}")
 
     return {"total": total_count}
 
@@ -342,7 +373,7 @@ def db_get_historial_paginado(offset: int, limit: int) -> Tuple[List[Dict], int]
     )
     
     mis_prestamos = []
-    print(response.items)
+    #print(response.items)
     for prestamo in response.items:
         
         titulo_libro = "Desconocido"
@@ -403,17 +434,47 @@ def db_get_historial_paginado(offset: int, limit: int) -> Tuple[List[Dict], int]
 def db_get_historial_por_fechas(start_date: str, end_date: str) -> Tuple[List[Dict], int]:
     """
     Retorna el historial de préstamos filtrado por un rango de fechas.
-    start_date y end_date deben venir en formato "YYYY-MM-DD HH:MM:SS" o "YYYY-MM-DD".
+    Convierte las fechas de búsqueda a UTC para PocketBase, y devuelve los
+    resultados convertidos a la hora local de la Ciudad de México.
     """
     client = db_get_client()
     
-    # Construcción del filtro de fecha
-    # Usamos created_at o fecha_prestamo según sea tu campo de control
-    date_filter = f'created_at >= "{start_date}" && created_at <= "{end_date}"'
+    # 1. Define Timezones
+    mx_tz = ZoneInfo("America/Mexico_City")
+    utc_tz = ZoneInfo("UTC")
 
     try:
-        # Al filtrar por fechas específicas, usualmente queremos la lista completa 
-        # del periodo en lugar de una página fija.
+        # Helper inner function to safely parse and localize loose formats
+        def parse_to_utc_str(date_str: str, is_end_of_day: bool = False) -> str:
+            date_str = date_str.strip()
+            # Case A: String contains only the date ("YYYY-MM-DD")
+            if len(date_str) == 10:
+                dt_naive = datetime.strptime(date_str, "%Y-%m-%d")
+                if is_end_of_day:
+                    dt_naive = dt_naive.replace(hour=23, minute=59, second=59)
+                else:
+                    dt_naive = dt_naive.replace(hour=0, minute=0, second=0)
+            # Case B: String contains full time ("YYYY-MM-DD HH:MM:SS")
+            else:
+                dt_naive = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            
+            # Label the naive input as Mexico City local time, then transform to UTC
+            dt_local = dt_naive.replace(tzinfo=mx_tz)
+            dt_utc = dt_local.astimezone(utc_tz)
+            return dt_utc.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Convert both input parameters dynamically
+        start_utc_str = parse_to_utc_str(start_date, is_end_of_day=False)
+        end_utc_str = parse_to_utc_str(end_date, is_end_of_day=True)
+
+    except Exception as parse_error:
+        print(f"Error al parsear el rango de fechas: {parse_error}")
+        return [], 0
+
+    # Construcción del filtro usando marcas de tiempo en formato UTC
+    date_filter = f'created_at >= "{start_utc_str}" && created_at <= "{end_utc_str}"'
+
+    try:
         response_items = client.collection("Prestamos").get_full_list(
             query_params={
                 "expand": "fk_id_copia.fk_id_libro.fk_id_genero, fk_id_usuario",
@@ -422,13 +483,25 @@ def db_get_historial_por_fechas(start_date: str, end_date: str) -> Tuple[List[Di
             }
         )
     except Exception as e:
-        print(f"Error al obtener historial por fechas: {e}")
+        print(f"Error al obtener historial por fechas desde PocketBase: {e}")
         return [], 0
+
+    # Helper function to convert DB UTC strings back to Mexico City strings
+    def format_to_local_string(utc_string: str) -> str:
+        if not utc_string:
+            return ""
+        try:
+            # Replace PocketBase 'Z' with explicit offset notation
+            clean_str = utc_string.replace("Z", "+00:00")
+            dt_utc = datetime.fromisoformat(clean_str)
+            dt_local = dt_utc.astimezone(mx_tz)
+            return dt_local.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return utc_string
 
     mis_prestamos = []
     
     for prestamo in response_items:
-        # Valores por defecto
         titulo_libro = "Desconocido"
         autor = "Desconocido"
         nombre_usuario = "Desconocido"
@@ -436,7 +509,6 @@ def db_get_historial_por_fechas(start_date: str, end_date: str) -> Tuple[List[Di
         id_usuario = "Desconocido"
         genero_lista = []
         
-        # Navegación segura por los niveles de expand
         expand_p = getattr(prestamo, "expand", {})
         copia = expand_p.get("fk_id_copia")
         usuario = expand_p.get("fk_id_usuario")
@@ -466,13 +538,16 @@ def db_get_historial_por_fechas(start_date: str, end_date: str) -> Tuple[List[Di
                 generos = expand_l.get("fk_id_genero")
                 
                 if generos:
-                    # Normalización de géneros (soporta objeto único o lista)
                     if isinstance(generos, list):
                         genero_lista = [getattr(g, "genero", "") for g in generos]
                     else:
                         genero_lista = [getattr(generos, "genero", "")]
 
-        # Construcción del objeto final
+        # Get values safely from object attributes
+        raw_fecha_prestamo = getattr(prestamo, "fecha_prestamo", "")
+        raw_fecha_entrega = getattr(prestamo, "fecha_entrega", "")
+        raw_creado = getattr(prestamo, "created", "")
+
         mis_prestamos.append({
             "usuario": nombre_usuario,
             "email": correo_usuario,
@@ -481,12 +556,13 @@ def db_get_historial_por_fechas(start_date: str, end_date: str) -> Tuple[List[Di
             "titulo": titulo_libro,
             "autor": autor,
             "genero": genero_lista,
-            "fecha_prestamo": getattr(prestamo, "fecha_prestamo", ""),
-            "fecha_entrega": getattr(prestamo, "fecha_entrega", ""),
+            # Dates converted to Mexico City timezone strings here:
+            "fecha_prestamo": format_to_local_string(raw_fecha_prestamo),
+            "fecha_entrega": format_to_local_string(raw_fecha_entrega),
             "estatus_entrega": getattr(prestamo, "estatus_entrega", False),
             "isbn": isbn_val,
             "rfid_tag": rfid_val,
-            "creado": getattr(prestamo, "created", "") # Útil para auditoría
+            "creado": format_to_local_string(raw_creado)
         })
     
     return mis_prestamos, len(mis_prestamos)
@@ -614,7 +690,7 @@ def db_get_generos_leidos_admin() -> List:
     conteo_generos = Counter(genero_lista)
     conteos_mensuales = []
     for gnere, count in conteo_generos.items():
-        print(gnere, count)
+        #print(gnere, count)
         obj_cont_mensual = { "nombre": gnere, "cantidad": count }
         conteos_mensuales.append(obj_cont_mensual)
 
@@ -696,7 +772,7 @@ def db_get_prestamos_por_mes(pk_id_usuario: str) -> List[Dict]:
     # 5. Build the list (Fixed: initialized OUTSIDE the loop)
     conteos_mensuales = []
     for month, count in conteo_por_mes.items():
-        print(f"{month}: {count}")
+        #print(f"{month}: {count}")
         conteos_mensuales.append({
             "mes": month, 
             "prestamos": count
@@ -712,10 +788,10 @@ def db_get_prestamos_por_mes_admin() -> List:
     )
     months = [datetime.fromisoformat(r.created_at.replace("Z", "+00:00")).strftime("%B") for r in  prestamos.items]
     conteo_por_mes = Counter(months)
-    print(conteo_por_mes)
+    #print(conteo_por_mes)
     conteos_mensuales = []
     for month, count in conteo_por_mes.items():
-        print(month, count)
+        #print(month, count)
         conteos_mensuales = []
         obj_cont_mensual = { "mes": month, "prestamos": count }
         conteos_mensuales.append(obj_cont_mensual)

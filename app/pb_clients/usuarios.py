@@ -342,16 +342,21 @@ def get_prestamos_ultimos_siete_dias() -> List:
     serie_prestamos = []
     for i in range(6, -1, -1):
         dia_local_inicio = medianoche_hoy_local - timedelta(days=i)
-        
         dia_local_fin = dia_local_inicio.replace(hour=23, minute=59, second=59, microsecond=0)
         
-        q_start = dia_local_inicio.strftime("%Y-%m-%d %H:%M:%S")
-        q_end = dia_local_fin.strftime("%Y-%m-%d %H:%M:%S")
+        # --- CONVERT TO UTC HERE ---
+        inicio_dia_utc = dia_local_inicio.astimezone(utc_tz)
+        fin_dia_utc = dia_local_fin.astimezone(utc_tz)
+        
+        # Format the UTC datetimes into strings for the database
+        q_start = inicio_dia_utc.strftime("%Y-%m-%d %H:%M:%S")
+        q_end = fin_dia_utc.strftime("%Y-%m-%d %H:%M:%S")
 
         count = client.collection("Prestamos").get_list(1, 1, {
             "filter": f'created_at >= "{q_start}" && created_at <= "{q_end}"'
         }).total_items
+        
         serie_prestamos.append(count)
-
+        print(f'Prestamos: {serie_prestamos}, Count: {count}, Creado UTC: {q_start} hasta {q_end}')
 
     return serie_prestamos
